@@ -9,6 +9,13 @@ on:
   pull_request:
     branches: [ main ]
 
+# 添加必要的权限
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+
 env:
   PYTHON_VERSION: '3.12'
 
@@ -275,19 +282,32 @@ jobs:
         EOF
         
     - name: 🎉 创建GitHub Release
-      uses: ncipollo/release-action@v1
-      with:
-        tag: ${{ github.ref_name }}
-        name: "小红书MCP工具包 ${{ github.ref_name }}"
-        bodyFile: release-notes.md
-        draft: false
-        prerelease: false
-        artifacts: "release/*"
-        token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # 检查GitHub CLI是否可用
+        gh --version
+        
+        # 检查Token权限
+        echo "🔑 检查GitHub Token权限..."
+        gh auth status
+        
+        # 检查要上传的文件
+        echo "📦 要上传的文件列表:"
+        find release/ -type f -exec ls -la {} \;
+        
+        # 创建Release
+        echo "🚀 创建GitHub Release..."
+        gh release create "${{ github.ref_name }}" \
+          --title "小红书MCP工具包 ${{ github.ref_name }}" \
+          --notes-file release-notes.md \
+          --draft=false \
+          --prerelease=false \
+          release/*
         
     - name: 📊 发布完成通知
       run: |
         echo "🎉 Release ${{ github.ref_name }} 创建成功!"
         echo "📦 包含以下文件:"
         ls -la release/
-        echo "🔗 访问地址: https://github.com/aki66938/xiaohongshu-mcp-toolkit/releases/tag/${{ github.ref_name }}" 
+        echo "🔗 访问地址: https://github.com/aki66938/xhs-toolkit/releases/tag/${{ github.ref_name }}" 
