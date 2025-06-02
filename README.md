@@ -1,6 +1,5 @@
 # 🌺 小红书MCP工具包
 
-[![最新版本](https://img.shields.io/github/v/release/aki66938/xiaohongshu-mcp-toolkit)](https://github.com/aki66938/xhs-toolkit/releases)
 [![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
 
 一个强大的小红书自动化工具包，支持通过MCP协议与AI客户端（如Claude Desktop等）集成，实现智能内容创作和发布。
