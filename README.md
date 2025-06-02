@@ -1,8 +1,8 @@
 # 🌺 小红书MCP工具包
 
-[![构建状态](https://github.com/aki66938/xiaohongshu-mcp-toolkit/workflows/🚀%20构建和发布小红书MCP工具包/badge.svg)](https://github.com/aki66938/xiaohongshu-mcp-toolkit/actions)
-[![最新版本](https://img.shields.io/github/v/release/aki66938/xiaohongshu-mcp-toolkit)](https://github.com/aki66938/xiaohongshu-mcp-toolkit/releases/latest)
-[![许可证](https://img.shields.io/github/license/aki66938/xiaohongshu-mcp-toolkit)](LICENSE)
+[![构建状态](https://github.com/aki66938/xiaohongshu-mcp-toolkit/workflows/🚀%20构建和发布小红书MCP工具包/badge.svg)](https://github.com/aki66938/xhs-toolkit/actions)
+[![最新版本](https://img.shields.io/github/v/release/aki66938/xiaohongshu-mcp-toolkit)](https://github.com/aki66938/xhs-toolkit/releases/latest)
+[![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
 
 一个强大的小红书自动化工具包，支持通过MCP协议与AI客户端（如Claude Desktop等）集成，实现智能内容创作和发布。
 
@@ -36,7 +36,7 @@ bash install.sh
 
 ### 下载使用
 
-1. 从 [Releases页面](https://github.com/aki66938/xiaohongshu-mcp-toolkit/releases/latest) 下载适合你操作系统的版本
+1. 从 [Releases页面](https://github.com/aki66938/xhs-toolkit/releases/latest) 下载适合你操作系统的版本
 2. 解压并运行：
    ```bash
    # macOS/Linux
@@ -178,8 +178,8 @@ json_path="./xhs/cookies"
 
 ## 🐛 问题反馈
 
-- 查看 [Issues](https://github.com/aki66938/xiaohongshu-mcp-toolkit/issues)
-- 创建 [新Issue](https://github.com/aki66938/xiaohongshu-mcp-toolkit/issues/new)
+- 查看 [Issues](https://github.com/aki66938/xhs-toolkit/issues)
+- 创建 [新Issue](https://github.com/aki66938/xhs-toolkit/issues/new)
 
 ## 📄 许可证
 
