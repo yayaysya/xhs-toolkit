@@ -1,6 +1,5 @@
 # 🌺 小红书MCP工具包
 
-[![构建状态](https://github.com/aki66938/xiaohongshu-mcp-toolkit/workflows/🚀%20构建和发布小红书MCP工具包/badge.svg)](https://github.com/aki66938/xhs-toolkit/actions)
 [![最新版本](https://img.shields.io/github/v/release/aki66938/xiaohongshu-mcp-toolkit)](https://github.com/aki66938/xhs-toolkit/releases)
 [![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
 
