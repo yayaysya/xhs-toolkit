@@ -120,6 +120,14 @@ jobs:
           xhs_toolkit.py
       shell: bash
       
+    - name: 🔍 检查构建结果
+      run: |
+        echo "📁 构建目录结构:"
+        find dist/ -type f
+        echo "📦 可执行文件信息:"
+        ls -la dist/
+      shell: bash
+      
     - name: 📤 上传构建产物
       uses: actions/upload-artifact@v4
       with:
@@ -153,28 +161,63 @@ jobs:
       run: |
         mkdir -p release/
         
+        # 检查下载的artifact结构
+        echo "📋 Artifact结构检查:"
+        find artifacts/ -type f | head -20
+        
         # 为每个平台创建压缩包
         cd artifacts/
         
         # Linux
-        mkdir -p linux-package
-        cp xhs-toolkit-linux-x64/xhs-toolkit-linux-x64 linux-package/xhs-toolkit
-        cp xhs-toolkit-linux-x64/{env_example.txt,README.md,LICENSE} linux-package/ 2>/dev/null || true
-        tar -czf ../release/xhs-toolkit-linux-x64.tar.gz -C linux-package .
+        if [ -d "xhs-toolkit-linux-x64" ]; then
+          mkdir -p linux-package
+          # 查找Linux可执行文件
+          if [ -f "xhs-toolkit-linux-x64/dist/xhs-toolkit-linux-x64" ]; then
+            cp xhs-toolkit-linux-x64/dist/xhs-toolkit-linux-x64 linux-package/xhs-toolkit
+          elif [ -f "xhs-toolkit-linux-x64/xhs-toolkit-linux-x64" ]; then
+            cp xhs-toolkit-linux-x64/xhs-toolkit-linux-x64 linux-package/xhs-toolkit
+          else
+            echo "❌ Linux可执行文件未找到"
+            find xhs-toolkit-linux-x64/ -name "*linux*" -type f
+          fi
+          cp xhs-toolkit-linux-x64/{env_example.txt,README.md,LICENSE} linux-package/ 2>/dev/null || true
+          tar -czf ../release/xhs-toolkit-linux-x64.tar.gz -C linux-package .
+        fi
         
         # Windows  
-        mkdir -p windows-package
-        cp xhs-toolkit-windows-x64.exe/xhs-toolkit-windows-x64.exe windows-package/xhs-toolkit.exe
-        cp xhs-toolkit-windows-x64.exe/{env_example.txt,README.md,LICENSE} windows-package/ 2>/dev/null || true
-        cd windows-package && zip -r ../../release/xhs-toolkit-windows-x64.zip . && cd ..
+        if [ -d "xhs-toolkit-windows-x64.exe" ]; then
+          mkdir -p windows-package
+          # 查找Windows可执行文件
+          if [ -f "xhs-toolkit-windows-x64.exe/dist/xhs-toolkit-windows-x64.exe" ]; then
+            cp xhs-toolkit-windows-x64.exe/dist/xhs-toolkit-windows-x64.exe windows-package/xhs-toolkit.exe
+          elif [ -f "xhs-toolkit-windows-x64.exe/xhs-toolkit-windows-x64.exe" ]; then
+            cp xhs-toolkit-windows-x64.exe/xhs-toolkit-windows-x64.exe windows-package/xhs-toolkit.exe
+          else
+            echo "❌ Windows可执行文件未找到"
+            find xhs-toolkit-windows-x64.exe/ -name "*windows*" -type f
+          fi
+          cp xhs-toolkit-windows-x64.exe/{env_example.txt,README.md,LICENSE} windows-package/ 2>/dev/null || true
+          cd windows-package && zip -r ../../release/xhs-toolkit-windows-x64.zip . && cd ..
+        fi
         
         # macOS
-        mkdir -p macos-package  
-        cp xhs-toolkit-macos-x64/xhs-toolkit-macos-x64 macos-package/xhs-toolkit
-        cp xhs-toolkit-macos-x64/{env_example.txt,README.md,LICENSE} macos-package/ 2>/dev/null || true
-        tar -czf ../release/xhs-toolkit-macos-x64.tar.gz -C macos-package .
+        if [ -d "xhs-toolkit-macos-x64" ]; then
+          mkdir -p macos-package  
+          # 查找macOS可执行文件
+          if [ -f "xhs-toolkit-macos-x64/dist/xhs-toolkit-macos-x64" ]; then
+            cp xhs-toolkit-macos-x64/dist/xhs-toolkit-macos-x64 macos-package/xhs-toolkit
+          elif [ -f "xhs-toolkit-macos-x64/xhs-toolkit-macos-x64" ]; then
+            cp xhs-toolkit-macos-x64/xhs-toolkit-macos-x64 macos-package/xhs-toolkit
+          else
+            echo "❌ macOS可执行文件未找到"
+            find xhs-toolkit-macos-x64/ -name "*macos*" -type f
+          fi
+          cp xhs-toolkit-macos-x64/{env_example.txt,README.md,LICENSE} macos-package/ 2>/dev/null || true
+          tar -czf ../release/xhs-toolkit-macos-x64.tar.gz -C macos-package .
+        fi
         
         cd ../
+        echo "📦 最终发布文件:"
         ls -la release/
         
     - name: 📝 生成发布说明
