@@ -1,13 +1,33 @@
 name: 🚀 构建和发布小红书MCP工具包
 
 on:
+  # 手动触发工作流
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'xhs_toolkit:v1.0.1'
+        required: true
+        default: 'v1.0.1'
+        type: string
+      release_type:
+        description: '发布类型'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch   # 修复版本 (1.0.0 -> 1.0.1)
+        - minor   # 功能版本 (1.0.0 -> 1.1.0)
+        - major   # 重大版本 (1.0.0 -> 2.0.0)
+      release_notes:
+        description: '发布说明（可选，将追加到自动生成的说明后）'
+        required: false
+        default: ''
+        type: string
+  
+  # 推送标签时也触发（备用方式）
   push:
     tags:
-      - 'v*'  # 当推送版本标签时触发（如 v1.0.0）
-    branches:
-      - main  # 推送到main分支时进行构建测试
-  pull_request:
-    branches: [ main ]
+      - 'v*'
 
 env:
   PYTHON_VERSION: '3.12'
@@ -146,11 +166,36 @@ jobs:
     name: 🎉 创建Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')  # 只在版本标签时创建release
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     
     steps:
     - name: 📥 检出代码
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史记录，用于生成更新日志
+    
+    - name: 🏷️ 设置版本信息
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+        else
+          VERSION="${{ github.ref_name }}"
+          RELEASE_TYPE="patch"
+        fi
+        
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "release_type=${RELEASE_TYPE}" >> $GITHUB_OUTPUT
+        echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
+        
+        # 创建标签（如果是手动触发）
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
+        fi
       
     - name: 📥 下载所有构建产物
       uses: actions/download-artifact@v4
@@ -221,30 +266,54 @@ jobs:
         ls -la release/
         
     - name: 📝 生成发布说明
+      id: release_notes
       run: |
-        cat > release-notes.md << 'EOF'
-        ## 🌺 小红书MCP工具包 ${{ github.ref_name }}
+        VERSION="${{ steps.version.outputs.version }}"
+        RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
+        VERSION_NO_V="${{ steps.version.outputs.version_no_v }}"
         
-        ### ✨ 新特性
-        - 支持小红书图文笔记自动发布
-        - 完整的MCP协议支持，与Claude Desktop无缝集成
-        - 智能Cookie管理和验证
-        - 多平台二进制文件支持
+        # 根据版本生成特定的更新说明
+        if [ "${VERSION_NO_V}" = "1.0.1" ]; then
+          cat > release-notes.md << 'EOF'
+        ## 🌺 小红书MCP工具包 v1.0.1
         
-        ### 📋 功能清单
+        > 🔧 **修复版本** - 解决Cookie失效和配置问题
+        
+        ### 🐛 Bug修复
+        
+        - **🍪 修复Cookie失效问题**: 重新定位导航页面为创作者中心，解决跳转时Cookie失效的问题
+        - **🌐 修复域名不匹配**: 将默认域名从 `www.xiaohongshu.com` 改为 `creator.xiaohongshu.com`
+        - **🔧 修复多平台环境变量配置**: 解决Windows/Mac/Linux平台下路径配置问题
+        - **📱 移除手机号验证**: 简化登录流程，完全依赖Cookie认证，不再需要手机号配置
+        
+        ### ✨ 改进优化
+        
+        - **🎯 直接访问创作者中心**: 登录时直接打开创作者中心页面，确保获取完整权限
+        - **🔍 智能路径检测**: Chrome和ChromeDriver支持自动检测，减少配置复杂度
+        - **📝 更新配置模板**: 简化 `env_example` 文件，移除不必要的配置项
+        - **🏗️ 改进Cookie格式**: 支持新版Cookie格式，包含版本和域名信息，向下兼容旧格式
+        
+        ### 🛠️ 技术改进
+        
+        - 跨平台Chrome路径自动检测
+        - 环境变量优先级配置系统
+        - 增强的Cookie验证和错误处理
+        - 统一的错误提示和帮助信息
+        
+        ### 📋 当前功能清单
         - [x] **图文发布** - 支持发布文字和图片笔记
-        - [x] **Cookie管理** - 安全获取、验证和管理登录凭证
-        - [x] **MCP协议支持** - 与AI客户端完美集成
-        - [x] **内容搜索** - 批量搜索和分析笔记
-        - [x] **用户信息** - 获取用户档案和数据分析
+        - [x] **Cookie管理** - 安全获取、验证和管理登录凭证  
+        - [x] **MCP协议支持** - 与Claude Desktop等AI客户端无缝集成
+        - [x] **用户信息** - 获取用户档案和数据
+        - [x] **搜索功能** - 搜索和分析笔记内容
         - [ ] **视频发布** - 支持发布视频笔记（开发中）
         
         ### 🚀 快速开始
         
         1. **下载对应平台的文件**
-        2. **解压到任意目录**
+        2. **解压到任意目录**  
         3. **复制配置文件**: `cp env_example.txt .env`
-        4. **编辑配置**: 填入Chrome路径、ChromeDriver路径和手机号
+        4. **编辑配置**: 填入Chrome和ChromeDriver路径（可选，支持自动检测）
         5. **获取登录凭证**: `./xhs-toolkit cookie save`
         6. **启动MCP服务**: `./xhs-toolkit server start`
         
@@ -256,12 +325,17 @@ jobs:
         | 🪟 Windows | `xhs-toolkit-windows-x64.zip` | 适用于x64 Windows系统 |
         | 🍎 macOS | `xhs-toolkit-macos-x64.tar.gz` | 适用于Intel Mac |
         
-        ### ⚠️ 使用要求
+        ### ⚠️ 重要变更
+        
+        - **不再需要手机号配置**: 删除了 `phone` 配置项，完全依赖Cookie认证
+        - **配置更简单**: Chrome和ChromeDriver支持自动检测，减少手动配置
+        - **Cookie域名变更**: 现在直接获取创作者中心Cookie，解决权限问题
+        
+        ### 💡 使用要求
         
         - **Chrome浏览器**: 必须安装Google Chrome
         - **ChromeDriver**: 需要安装匹配版本的ChromeDriver
         - **网络连接**: 需要能够访问小红书网站
-        - **配置文件**: 必须正确配置.env文件
         
         ### 🔗 相关链接
         
@@ -273,21 +347,72 @@ jobs:
         
         **Made with ❤️ for content creators**
         EOF
+        else
+          # 通用的发布说明模板
+          cat > release-notes.md << EOF
+        ## 🌺 小红书MCP工具包 ${VERSION}
+        
+        > 📦 **${RELEASE_TYPE} 版本发布**
+        
+        ### ✨ 主要特性
+        - 支持小红书图文笔记自动发布
+        - 完整的MCP协议支持，与Claude Desktop无缝集成
+        - 智能Cookie管理和验证
+        - 多平台二进制文件支持
+        
+        ### 📋 功能清单
+        - [x] **图文发布** - 支持发布文字和图片笔记
+        - [x] **Cookie管理** - 安全获取、验证和管理登录凭证
+        - [x] **MCP协议支持** - 与AI客户端完美集成
+        - [x] **用户信息** - 获取用户档案和数据分析
+        - [ ] **视频发布** - 支持发布视频笔记（开发中）
+        
+        ### 🚀 快速开始
+        
+        1. **下载对应平台的文件**
+        2. **解压到任意目录**
+        3. **复制配置文件**: \`cp env_example.txt .env\`
+        4. **编辑配置**: 填入Chrome和ChromeDriver路径
+        5. **获取登录凭证**: \`./xhs-toolkit cookie save\`
+        6. **启动MCP服务**: \`./xhs-toolkit server start\`
+        
+        ### 📦 下载说明
+        
+        | 平台 | 文件 | 说明 |
+        |------|------|------|
+        | 🐧 Linux | \`xhs-toolkit-linux-x64.tar.gz\` | 适用于x64 Linux系统 |
+        | 🪟 Windows | \`xhs-toolkit-windows-x64.zip\` | 适用于x64 Windows系统 |
+        | 🍎 macOS | \`xhs-toolkit-macos-x64.tar.gz\` | 适用于Intel Mac |
+        
+        ---
+        
+        **Made with ❤️ for content creators**
+        EOF
+        fi
+        
+        # 如果手动输入了额外的发布说明，追加到文件末尾
+        if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          echo "" >> release-notes.md
+          echo "### 📝 其他说明" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "${{ github.event.inputs.release_notes }}" >> release-notes.md
+        fi
         
     - name: 🎉 创建GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        tag: ${{ github.ref_name }}
-        name: "小红书MCP工具包 ${{ github.ref_name }}"
+        tag: ${{ steps.version.outputs.version }}
+        name: "小红书MCP工具包 ${{ steps.version.outputs.version }}"
         bodyFile: release-notes.md
         draft: false
         prerelease: false
         artifacts: "release/*"
         token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true  # 允许更新已存在的release
         
     - name: 📊 发布完成通知
       run: |
-        echo "🎉 Release ${{ github.ref_name }} 创建成功!"
+        echo "🎉 Release ${{ steps.version.outputs.version }} 创建成功!"
         echo "📦 包含以下文件:"
         ls -la release/
-        echo "🔗 访问地址: https://github.com/aki66938/xiaohongshu-mcp-toolkit/releases/tag/${{ github.ref_name }}" 
+        echo "🔗 访问地址: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}" 
