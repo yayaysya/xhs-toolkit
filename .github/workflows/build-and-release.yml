@@ -188,14 +188,6 @@ jobs:
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "release_type=${RELEASE_TYPE}" >> $GITHUB_OUTPUT
         echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
-        
-        # 创建标签（如果是手动触发）
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${VERSION}" -m "Release ${VERSION}"
-          git push origin "${VERSION}"
-        fi
       
     - name: 📥 下载所有构建产物
       uses: actions/download-artifact@v4
@@ -402,6 +394,8 @@ jobs:
         artifacts: "release/*"
         token: ${{ secrets.GITHUB_TOKEN }}
         allowUpdates: true  # 允许更新已存在的release
+        makeLatest: true    # 标记为最新版本
+        generateReleaseNotes: false  # 不使用自动生成，使用我们的自定义说明
         
     - name: 📊 发布完成通知
       run: |
