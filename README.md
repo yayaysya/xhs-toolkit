@@ -66,7 +66,7 @@ python xhs_toolkit.py status
 复制并编辑配置文件：
 
 ```bash
-cp env_example.txt .env
+cp env_example .env
 vim .env  # 编辑配置
 ```
 
