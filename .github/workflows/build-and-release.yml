@@ -128,7 +128,7 @@ jobs:
         pyinstaller \
           --onefile \
           --name ${{ matrix.binary_name }} \
-          --add-data "env_example.txt:." \
+          --add-data "env_example:." \
           --hidden-import dotenv \
           --hidden-import selenium \
           --hidden-import selenium.webdriver \
@@ -154,7 +154,7 @@ jobs:
         name: ${{ matrix.binary_name }}
         path: |
           dist/${{ matrix.binary_name }}*
-          env_example.txt
+          env_example
           README.md
           LICENSE
         retention-days: 7
@@ -225,7 +225,7 @@ jobs:
             echo "❌ Linux可执行文件未找到"
             find xhs-toolkit-linux-x64/ -name "*linux*" -type f
           fi
-          cp xhs-toolkit-linux-x64/{env_example.txt,README.md,LICENSE} linux-package/ 2>/dev/null || true
+          cp xhs-toolkit-linux-x64/{env_example,README.md,LICENSE} linux-package/ 2>/dev/null || true
           tar -czf ../release/xhs-toolkit-linux-x64.tar.gz -C linux-package .
         fi
         
@@ -241,7 +241,7 @@ jobs:
             echo "❌ Windows可执行文件未找到"
             find xhs-toolkit-windows-x64.exe/ -name "*windows*" -type f
           fi
-          cp xhs-toolkit-windows-x64.exe/{env_example.txt,README.md,LICENSE} windows-package/ 2>/dev/null || true
+          cp xhs-toolkit-windows-x64.exe/{env_example,README.md,LICENSE} windows-package/ 2>/dev/null || true
           cd windows-package && zip -r ../../release/xhs-toolkit-windows-x64.zip . && cd ..
         fi
         
@@ -257,7 +257,7 @@ jobs:
             echo "❌ macOS可执行文件未找到"
             find xhs-toolkit-macos-x64/ -name "*macos*" -type f
           fi
-          cp xhs-toolkit-macos-x64/{env_example.txt,README.md,LICENSE} macos-package/ 2>/dev/null || true
+          cp xhs-toolkit-macos-x64/{env_example,README.md,LICENSE} macos-package/ 2>/dev/null || true
           tar -czf ../release/xhs-toolkit-macos-x64.tar.gz -C macos-package .
         fi
         
@@ -300,19 +300,12 @@ jobs:
         - 增强的Cookie验证和错误处理
         - 统一的错误提示和帮助信息
         
-        ### 📋 当前功能清单
-        - [x] **图文发布** - 支持发布文字和图片笔记
-        - [x] **Cookie管理** - 安全获取、验证和管理登录凭证  
-        - [x] **MCP协议支持** - 与Claude Desktop等AI客户端无缝集成
-        - [x] **用户信息** - 获取用户档案和数据
-        - [x] **搜索功能** - 搜索和分析笔记内容
-        - [ ] **视频发布** - 支持发布视频笔记（开发中）
         
         ### 🚀 快速开始
         
         1. **下载对应平台的文件**
         2. **解压到任意目录**  
-        3. **复制配置文件**: `cp env_example.txt .env`
+        3. **复制配置文件**: `cp env_example .env`
         4. **编辑配置**: 填入Chrome和ChromeDriver路径（可选，支持自动检测）
         5. **获取登录凭证**: `./xhs-toolkit cookie save`
         6. **启动MCP服务**: `./xhs-toolkit server start`
@@ -371,7 +364,7 @@ jobs:
         
         1. **下载对应平台的文件**
         2. **解压到任意目录**
-        3. **复制配置文件**: \`cp env_example.txt .env\`
+                 3. **复制配置文件**: \`cp env_example .env\`
         4. **编辑配置**: 填入Chrome和ChromeDriver路径
         5. **获取登录凭证**: \`./xhs-toolkit cookie save\`
         6. **启动MCP服务**: \`./xhs-toolkit server start\`
