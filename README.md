@@ -78,20 +78,23 @@ CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 # ChromeDriver路径  
 WEBDRIVER_CHROME_DRIVER="/opt/homebrew/bin/chromedriver"
 
-# 手机号码（用于登录）
-phone="您的手机号码"
-
 # Cookies存储路径
 json_path="./xhs/cookies"
 ```
 
-### 2. 获取登录凭证
+### 2. 获取登录凭证（改进版本）
 
 ```bash
 ./xhs-toolkit cookie save
 ```
 
-在弹出的浏览器中登录小红书，完成后按回车键保存。
+**重要改进**：新版本直接获取创作者中心权限cookies，解决跳转失效问题
+
+在弹出的浏览器中：
+1. 登录小红书创作者中心
+2. 确保能正常访问创作者中心功能
+3. 建议点击进入【发布笔记】页面，确认权限完整
+4. 完成后按回车键保存
 
 ### 3. 启动MCP服务器
 
