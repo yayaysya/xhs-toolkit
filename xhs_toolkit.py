@@ -30,12 +30,19 @@ def cookie_command(action):
     """处理cookie相关命令"""
     print(f"🍪 执行Cookie操作: {action}")
     
+    if action == "save":
+        print("📝 注意：新版本直接获取创作者中心权限cookies")
+        print("🔧 这将解决跳转到创作者中心时cookies失效的问题")
+    
     try:
         # 直接导入并调用具体函数，更清晰更可靠
         import cookie_helper
         
         if action == "save":
             result = cookie_helper.save_cookies_interactive()
+            if result:
+                print("\n🎉 Cookies获取成功！")
+                print("💡 现在可以正常访问创作者中心功能了")
             return result
         elif action == "show":
             cookie_helper.load_and_display_cookies()
@@ -43,9 +50,10 @@ def cookie_command(action):
         elif action == "validate":
             result = cookie_helper.validate_cookies()
             if result:
-                print("✅ Cookies验证通过")
+                print("✅ Cookies验证通过，可以正常使用创作者功能")
             else:
-                print("❌ Cookies验证失败")
+                print("❌ Cookies验证失败，可能影响创作者中心访问")
+                print("💡 建议重新获取: python cookie_helper.py save")
             return result
         else:
             print(f"❌ 未知操作: {action}")
@@ -53,6 +61,11 @@ def cookie_command(action):
             
     except Exception as e:
         print(f"❌ Cookie操作失败: {e}")
+        if action == "save":
+            print("💡 常见解决方案:")
+            print("   1. 确保Chrome和ChromeDriver版本兼容")
+            print("   2. 检查网络连接是否正常")
+            print("   3. 确认小红书网站可以正常访问")
         return False
 
 def server_command(action, port=8000, host="0.0.0.0"):
@@ -203,18 +216,40 @@ def status_command():
     print("=" * 40)
     
     # 检查Chrome
-    chrome_path = os.getenv("CHROME_PATH", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
-    chrome_exists = os.path.exists(chrome_path)
-    print(f"🌐 Chrome浏览器: {'✅ 已安装' if chrome_exists else '❌ 未找到'}")
-    if not chrome_exists:
-        print(f"   路径: {chrome_path}")
+    chrome_path = os.getenv("CHROME_PATH")
+    if chrome_path:
+        chrome_exists = os.path.exists(chrome_path)
+        print(f"🌐 Chrome浏览器: {'✅ 已安装' if chrome_exists else '❌ 未找到'}")
+        if not chrome_exists:
+            print(f"   配置路径: {chrome_path}")
+    else:
+        # 尝试自动检测Chrome
+        from cookie_helper import _get_default_chrome_path
+        auto_chrome_path = _get_default_chrome_path()
+        if auto_chrome_path:
+            print(f"🌐 Chrome浏览器: ✅ 自动检测到")
+            print(f"   路径: {auto_chrome_path}")
+        else:
+            print("🌐 Chrome浏览器: ❌ 未找到")
+            print("   请在.env文件中配置CHROME_PATH")
     
     # 检查ChromeDriver
-    chromedriver_path = os.getenv("WEBDRIVER_CHROME_DRIVER", "/opt/homebrew/bin/chromedriver")
-    chromedriver_exists = os.path.exists(chromedriver_path)
-    print(f"🚗 ChromeDriver: {'✅ 已安装' if chromedriver_exists else '❌ 未找到'}")
-    if not chromedriver_exists:
-        print(f"   路径: {chromedriver_path}")
+    chromedriver_path = os.getenv("WEBDRIVER_CHROME_DRIVER")
+    if chromedriver_path:
+        chromedriver_exists = os.path.exists(chromedriver_path)
+        print(f"🚗 ChromeDriver: {'✅ 已安装' if chromedriver_exists else '❌ 未找到'}")
+        if not chromedriver_exists:
+            print(f"   配置路径: {chromedriver_path}")
+    else:
+        # 尝试从PATH中查找
+        import shutil
+        chromedriver_path = shutil.which("chromedriver")
+        if chromedriver_path:
+            print(f"🚗 ChromeDriver: ✅ 在PATH中找到")
+            print(f"   路径: {chromedriver_path}")
+        else:
+            print("🚗 ChromeDriver: ❌ 未找到")
+            print("   请在.env文件中配置WEBDRIVER_CHROME_DRIVER或添加到PATH")
     
     # 检查Cookies
     cookies_file = Path("xhs/cookies/xiaohongshu_cookies.json")
@@ -272,7 +307,7 @@ def check_environment():
         print("💡 请先创建.env文件:")
         print("   1. cp env_example.txt .env")
         print("   2. 编辑.env文件，填入您的配置")
-        print("   3. 必需配置: CHROME_PATH, WEBDRIVER_CHROME_DRIVER, phone")
+        print("   3. 必需配置: CHROME_PATH, WEBDRIVER_CHROME_DRIVER")
         return False
     
     print("✅ .env文件存在")
@@ -280,8 +315,7 @@ def check_environment():
     # 检查必需的环境变量
     required_vars = {
         "CHROME_PATH": "Chrome浏览器路径",
-        "WEBDRIVER_CHROME_DRIVER": "ChromeDriver路径", 
-        "phone": "手机号码"
+        "WEBDRIVER_CHROME_DRIVER": "ChromeDriver路径"
     }
     
     missing_vars = []
