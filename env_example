@@ -1,0 +1,104 @@
+# 小红书MCP工具包环境配置文件
+# 使用说明：将此文件复制为 .env 并根据您的系统修改配置
+
+# ================================
+# 浏览器和驱动配置（必需）
+# ================================
+
+# ChromeDriver可执行文件路径
+# 如果已添加到系统PATH，可以不配置此项
+# Windows示例：
+WEBDRIVER_CHROME_DRIVER=C:\chromedriver\chromedriver.exe
+# Mac示例：
+# WEBDRIVER_CHROME_DRIVER=/usr/local/bin/chromedriver
+# WEBDRIVER_CHROME_DRIVER=/opt/homebrew/bin/chromedriver
+# Linux示例：
+# WEBDRIVER_CHROME_DRIVER=/usr/local/bin/chromedriver
+
+# Chrome浏览器可执行文件路径（可选）
+# 通常不需要配置，程序会自动检测
+# 如果自动检测失败，请取消下面对应系统的注释并填写正确路径
+
+# Windows路径示例：
+# CHROME_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
+# CHROME_PATH=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+
+# Mac路径示例：
+# CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+
+# Linux路径示例：
+# CHROME_PATH=/usr/bin/google-chrome
+# CHROME_PATH=/usr/bin/google-chrome-stable
+
+# ================================
+# 小红书账户配置
+# ================================
+
+# Cookies存储目录
+json_path=./xhs/cookies
+
+# ================================
+# 系统配置
+# ================================
+
+# 日志级别
+# DEBUG - 详细调试信息（开发调试用）
+# INFO - 常规信息（推荐）
+# WARNING - 警告和错误
+# ERROR - 仅错误信息
+LOG_LEVEL=INFO
+
+# MCP服务器配置
+FASTMCP_SERVER_HOST=0.0.0.0
+FASTMCP_SERVER_PORT=8000
+
+# ================================
+# 安装说明
+# ================================
+
+# 1. ChromeDriver安装
+# 
+# Windows:
+#   1. 查看Chrome版本：
+#      Get-ItemProperty "HKLM:SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome" | Select-Object DisplayVersion
+#   2. 下载对应版本：https://googlechromelabs.github.io/chrome-for-testing/
+#   3. 解压到 C:\chromedriver\ 目录
+#   4. 添加到PATH或在上面配置完整路径
+#
+# Mac:
+#   brew install --cask chromedriver
+#   或手动下载解压到 /usr/local/bin/
+#
+# Linux:
+#   1. 下载对应版本的ChromeDriver
+#   2. sudo cp chromedriver /usr/local/bin/
+#   3. sudo chmod +x /usr/local/bin/chromedriver
+
+# 2. 验证安装
+#   运行: python cookie_helper.py test
+#   应该看到: ✅ ChromeDriver配置测试成功！
+
+# 3. 获取Cookies
+#   运行: python xhs_toolkit.py cookie save
+#   在浏览器中登录小红书创作者中心
+
+# 4. 启动MCP服务器
+#   运行: python xhs_toolkit.py server start
+#   服务器将在 http://localhost:8000 启动
+
+# ================================
+# 常见问题
+# ================================
+
+# Q: ChromeDriver版本不匹配？
+# A: 确保ChromeDriver版本与Chrome浏览器版本匹配
+#    查看Chrome版本后下载对应的ChromeDriver
+
+# Q: 找不到ChromeDriver？
+# A: 检查路径是否正确，或将chromedriver添加到系统PATH
+
+# Q: Cookies失效？
+# A: 重新运行 python xhs_toolkit.py cookie save 获取新的cookies
+
+# Q: 权限错误（Mac）？
+# A: 运行 xattr -d com.apple.quarantine /usr/local/bin/chromedriver 
