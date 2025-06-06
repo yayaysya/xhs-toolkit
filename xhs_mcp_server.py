@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional
 from pathlib import Path
 import sys
 import signal
+import shutil
 
 # 加载环境变量配置
 from dotenv import load_dotenv
@@ -70,10 +71,47 @@ if log_level == "DEBUG":
 class XHSConfig:
     """小红书配置类"""
     
+    def _get_default_chrome_path(self):
+        """获取默认Chrome浏览器路径（跨平台）"""
+        import platform
+        
+        system = platform.system().lower()
+        chrome_paths = []
+        
+        if system == "windows":
+            chrome_paths = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe"),
+            ]
+        elif system == "darwin":  # macOS
+            chrome_paths = [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            ]
+        elif system == "linux":
+            chrome_paths = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+                "/snap/bin/chromium",
+            ]
+        
+        # 检查路径是否存在
+        for path in chrome_paths:
+            if os.path.exists(path):
+                return path
+        
+        # 如果都找不到，返回None
+        return None
+    
     def __init__(self):
-        self.chrome_path = os.getenv("CHROME_PATH", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
-        self.chromedriver_path = os.getenv("WEBDRIVER_CHROME_DRIVER", "/opt/homebrew/bin/chromedriver")
-        self.phone = os.getenv("phone", "")
+        # Chrome路径：先从环境变量读取，没有则自动检测
+        self.chrome_path = os.getenv("CHROME_PATH") or self._get_default_chrome_path()
+        
+        # ChromeDriver路径：先从环境变量读取，没有则从PATH查找
+        self.chromedriver_path = os.getenv("WEBDRIVER_CHROME_DRIVER") or shutil.which("chromedriver")
         self.json_path = os.getenv("json_path", "./xhs/cookies")
         self.cookies_file = os.path.join(self.json_path, "xiaohongshu_cookies.json")
         
@@ -82,7 +120,6 @@ class XHSConfig:
             logger.debug("🔧 配置信息:")
             logger.debug(f"   Chrome路径: {self.chrome_path}")
             logger.debug(f"   ChromeDriver路径: {self.chromedriver_path}")
-            logger.debug(f"   手机号: {self.phone[:3]}****{self.phone[-4:] if len(self.phone) >= 7 else '****'}")
             logger.debug(f"   Cookies路径: {self.json_path}")
             logger.debug(f"   Cookies文件: {self.cookies_file}")
             logger.debug(f"   Cookies文件存在: {os.path.exists(self.cookies_file)}")
@@ -92,14 +129,17 @@ class XHSConfig:
         """验证配置完整性"""
         issues = []
         
-        if not os.path.exists(self.chrome_path):
+        # 检查Chrome浏览器路径
+        if not self.chrome_path:
+            issues.append("Chrome浏览器路径未配置且无法自动检测")
+        elif not os.path.exists(self.chrome_path):
             issues.append(f"Chrome浏览器未找到: {self.chrome_path}")
             
-        if not os.path.exists(self.chromedriver_path):
+        # 检查ChromeDriver路径
+        if not self.chromedriver_path:
+            issues.append("ChromeDriver路径未配置且无法自动检测（请在.env中设置WEBDRIVER_CHROME_DRIVER或添加到PATH）")
+        elif not os.path.exists(self.chromedriver_path):
             issues.append(f"ChromeDriver未找到: {self.chromedriver_path}")
-            
-        if not self.phone:
-            issues.append("未配置手机号码")
             
         if not os.path.exists(self.json_path):
             try:
@@ -114,14 +154,28 @@ class XHSConfig:
         }
         
     def load_cookies(self) -> List[Dict]:
-        """加载cookies"""
+        """加载cookies - 支持新旧格式兼容"""
         try:
             if not os.path.exists(self.cookies_file):
                 logger.warning(f"Cookies文件不存在: {self.cookies_file}")
                 return []
                 
             with open(self.cookies_file, 'r', encoding='utf-8') as f:
-                cookies = json.load(f)
+                cookies_data = json.load(f)
+            
+            # **兼容新旧格式**
+            if isinstance(cookies_data, list):
+                # 旧格式：直接是cookies列表
+                cookies = cookies_data
+                if log_level == "DEBUG":
+                    logger.debug("检测到旧版本cookies格式")
+            else:
+                # 新格式：包含元数据
+                cookies = cookies_data.get('cookies', [])
+                version = cookies_data.get('version', '1.0')
+                domain = cookies_data.get('domain', 'unknown')
+                if log_level == "DEBUG":
+                    logger.debug(f"检测到新版本cookies格式，版本: {version}, 域名: {domain}")
             
             if log_level == "DEBUG":
                 logger.debug(f"🔧 成功加载 {len(cookies)} 个cookies")
@@ -252,10 +306,10 @@ class XHSClient:
                 logger.debug(f"🔧 浏览器窗口大小: {self.driver.get_window_size()}")
                 logger.debug(f"🔧 浏览器版本: {self.driver.capabilities.get('browserVersion', 'Unknown')}")
             
-            logger.info("🌐 浏览器启动成功，正在访问小红书...")
-            # 加载cookies
-            self.driver.get("https://www.xiaohongshu.com")
-            logger.info("📄 已访问小红书主页，开始加载cookies...")
+            logger.info("🌐 浏览器启动成功，正在访问小红书创作者中心...")
+            # **核心修复**：直接访问创作者中心以支持完整功能
+            self.driver.get("https://creator.xiaohongshu.com")
+            logger.info("📄 已访问创作者中心，开始加载cookies...")
             
             cookies = self.config.load_cookies()
             if not cookies:
@@ -361,7 +415,7 @@ class XHSClient:
         """搜索小红书笔记"""
         try:
             self.init_driver()
-            search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}"
+            search_url = f"https://creator.xiaohongshu.com/search_result?keyword={keyword}"
             self.driver.get(search_url)
             
             if log_level == "DEBUG":
@@ -423,7 +477,7 @@ class XHSClient:
         """获取笔记详情"""
         try:
             self.init_driver()
-            note_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+            note_url = f"https://creator.xiaohongshu.com/explore/{note_id}"
             self.driver.get(note_url)
             
             if log_level == "DEBUG":
@@ -676,9 +730,9 @@ class XHSClient:
         try:
             if not user_id:
                 # 获取当前登录用户信息
-                url = "https://www.xiaohongshu.com/api/sns/web/v1/user/selfinfo"
+                url = "https://creator.xiaohongshu.com/api/sns/web/v1/user/selfinfo"
             else:
-                url = f"https://www.xiaohongshu.com/api/sns/web/v1/user/{user_id}"
+                url = f"https://creator.xiaohongshu.com/api/sns/web/v1/user/{user_id}"
             
             response = self.session.get(url)
             if response.status_code == 200:
@@ -900,7 +954,6 @@ def get_xhs_config() -> str:
     config_info = {
         "chrome_path": config.chrome_path,
         "chromedriver_path": config.chromedriver_path,
-        "phone": config.phone[:3] + "****" + config.phone[-4:] if config.phone else "",
         "cookies_loaded": len(config.load_cookies()) > 0,
         "server_status": "running"
     }
@@ -961,8 +1014,7 @@ def get_xhs_help() -> str:
 ## 环境变量
 
 - CHROME_PATH: Chrome浏览器路径
-- WEBDRIVER_CHROME_DRIVER: ChromeDriver路径  
-- phone: 手机号码
+- WEBDRIVER_CHROME_DRIVER: ChromeDriver路径
 - json_path: Cookies文件路径
 """
     return help_text
