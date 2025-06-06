@@ -52,7 +52,6 @@ if [ ! -f ".env" ]; then
     rm .env.bak 2>/dev/null || true
     
     echo "✅ 配置文件已创建"
-    echo "⚠️  请编辑 .env 文件，填入您的手机号码"
 else
     echo "✅ 配置文件已存在"
 fi
@@ -68,8 +67,7 @@ echo ""
 echo "🎉 安装完成！"
 echo ""
 echo "📋 下一步："
-echo "1. 编辑 .env 文件，填入您的手机号码"
-echo "2. 运行: ./xhs-toolkit cookie save"
-echo "3. 运行: ./xhs-toolkit server start"
+echo "1. 运行: ./xhs-toolkit cookie save"
+echo "2. 运行: ./xhs-toolkit server start"
 echo ""
 echo "💡 更多帮助: ./xhs-toolkit --help" 
