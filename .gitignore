@@ -57,7 +57,7 @@ xhs_server.log
 # 敏感文件
 xhs/cookies/xiaohongshu_cookies.json
 *.cookies
-.env              # 用户配置文件（包含敏感信息）
+.env              
 .env.local
 # 注意：env_example.txt是示例文件，应该被包含在版本控制中
 
