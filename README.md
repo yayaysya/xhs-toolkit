@@ -1,7 +1,7 @@
 # 🌺 小红书MCP工具包
 
 [![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
-[![微信公众号](https://example.com/wechat-qrcode.png)](https://weixin.qq.com/r/yourcode)
+[![微信公众号](https://img.shields.io/badge/凯隐的无人化生产矩阵-公众号-bule?style=flat-square&logo=wechat)](src/static/qrcode_for_gh_19088e185f66_258.jpg)
 
 一个强大的小红书自动化工具包，支持通过MCP协议与AI客户端（如Claude Desktop等）集成，实现智能内容创作和发布。
 

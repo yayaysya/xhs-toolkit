@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 
 # 添加src目录到Python路径
-sys.path.insert(0, 'src')
+sys.path.insert(0, '../src')
 
 # 收集src目录下的所有模块
 def collect_src_modules():
     """收集src目录下的所有Python模块"""
     modules = []
-    src_path = Path('src')
+    src_path = Path('../src')
     
     for py_file in src_path.rglob('*.py'):
         if py_file.name != '__init__.py':
@@ -61,14 +61,14 @@ hidden_imports = [
 
 # 数据文件
 datas = [
-    ('env_example', '.'),
-    ('src', 'src'),
-    ('README.md', '.'),
-    ('LICENSE', '.'),
+    ('../env_example', '.'),
+    ('../src', 'src'),
+    ('../README.md', '.'),
+    ('../LICENSE', '.'),
 ]
 
 a = Analysis(
-    ['xhs_toolkit.py'],
+    ['../xhs_toolkit.py'],
     pathex=[],
     binaries=[],
     datas=datas,
