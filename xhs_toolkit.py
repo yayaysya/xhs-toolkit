@@ -28,20 +28,21 @@ logger = get_logger(__name__)
 
 def print_banner():
     """打印工具横幅"""
-    banner = """
+    from src import __version__
+    banner = f"""
 ╭─────────────────────────────────────────╮
 │           小红书MCP工具包               │
-│     Xiaohongshu MCP Toolkit v1.0        │
+│     Xiaohongshu MCP Toolkit v{__version__}      │
 ╰─────────────────────────────────────────╯
 """
     try:
         print(banner)
     except UnicodeEncodeError:
         # Windows GBK编码兼容性处理
-        simple_banner = """
+        simple_banner = f"""
 ==========================================
           小红书MCP工具包
-    Xiaohongshu MCP Toolkit v1.0
+    Xiaohongshu MCP Toolkit v{__version__}
 ==========================================
 """
         print(simple_banner)
@@ -108,7 +109,7 @@ def cookie_command(action: str) -> bool:
             safe_print("   3. 确认小红书网站可以正常访问")
         return False
 
-def server_command(action: str, port: int = 3001, host: str = "0.0.0.0") -> bool:
+def server_command(action: str, port: int = 8000, host: str = "0.0.0.0") -> bool:
     """
     服务器管理命令
     
@@ -250,7 +251,7 @@ def server_command(action: str, port: int = 3001, host: str = "0.0.0.0") -> bool
         return False
 
 async def publish_command(title: str, content: str, tags: str = "", 
-                         location: str = "", images: str = "") -> bool:
+                         location: str = "", images: str = "", videos: str = "") -> bool:
     """
     直接发布命令
     
@@ -260,6 +261,7 @@ async def publish_command(title: str, content: str, tags: str = "",
         tags: 标签（逗号分隔）
         location: 位置信息
         images: 图片路径（逗号分隔）
+        videos: 视频路径（逗号分隔）
         
     Returns:
         发布是否成功
@@ -288,7 +290,8 @@ async def publish_command(title: str, content: str, tags: str = "",
             content=content,
             tags_str=tags,
             location=location,
-            images_str=images
+            images_str=images,
+            videos_str=videos
         )
         
         # 发布笔记
@@ -417,7 +420,7 @@ def main():
     server_parser = subparsers.add_parser("server", help="MCP服务器管理")
     server_parser.add_argument("action", choices=["start", "stop", "status"], 
                               help="操作类型")
-    server_parser.add_argument("--port", type=int, default=3001, help="服务器端口")
+    server_parser.add_argument("--port", type=int, default=8000, help="服务器端口")
     server_parser.add_argument("--host", default="0.0.0.0", help="服务器主机")
     
     # 发布命令
@@ -427,6 +430,7 @@ def main():
     publish_parser.add_argument("--tags", default="", help="标签（逗号分隔）")
     publish_parser.add_argument("--location", default="", help="位置信息")
     publish_parser.add_argument("--images", default="", help="图片路径（逗号分隔）")
+    publish_parser.add_argument("--videos", default="", help="视频路径（逗号分隔）")
     
     # 配置管理命令
     config_parser = subparsers.add_parser("config", help="配置管理")
@@ -451,7 +455,7 @@ def main():
             success = server_command(args.action, args.port, args.host)
         elif args.command == "publish":
             success = asyncio.run(publish_command(
-                args.title, args.content, args.tags, args.location, args.images
+                args.title, args.content, args.tags, args.location, args.images, args.videos
             ))
         elif args.command == "config":
             success = config_command(args.action)

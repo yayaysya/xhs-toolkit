@@ -78,7 +78,7 @@ class MCPServer:
         
         @self.mcp.tool()
         async def publish_xiaohongshu_note(title: str, content: str, tags: str = "", 
-                                         location: str = "", images: str = "") -> str:
+                                         location: str = "", images: str = "", videos: str = "") -> str:
             """
             发布小红书笔记
             
@@ -88,6 +88,7 @@ class MCPServer:
                 tags (str, optional): 标签，用逗号分隔，例如："生活,旅行,美食"
                 location (str, optional): 位置信息，例如："北京"
                 images (str, optional): 图片文件路径，用逗号分隔，例如："/Volumes/xhs-files/image1.jpg,/Volumes/xhs-files/image2.jpg"
+                videos (str, optional): 视频文件路径，用逗号分隔，例如："/Volumes/xhs-files/video1.mp4"
             
             Returns:
                 str: 发布结果的JSON字符串
@@ -95,7 +96,7 @@ class MCPServer:
             Example:
                 title="今日美食", content="推荐一家好吃的餐厅", tags="美食,生活", images="/Volumes/xhs-files/food.jpg"
             """
-            logger.info(f"📝 开始发布小红书笔记: 标题='{title}', 标签='{tags}', 位置='{location}', 图片='{images}'")
+            logger.info(f"📝 开始发布小红书笔记: 标题='{title}', 标签='{tags}', 位置='{location}', 图片='{images}', 视频='{videos}'")
             
             try:
                 note = XHSNote.from_strings(
@@ -103,10 +104,14 @@ class MCPServer:
                     content=content,
                     tags_str=tags,
                     location=location,
-                    images_str=images
+                    images_str=images,
+                    videos_str=videos
                 )
                 
-                logger.info(f"📸 处理图片路径: {note.images}")
+                if note.images:
+                    logger.info(f"📸 处理图片路径: {note.images}")
+                if note.videos:
+                    logger.info(f"🎬 处理视频路径: {note.videos}")
                 logger.info("📱 正在初始化浏览器...")
                 
                 result = await self.xhs_client.publish_note(note)
@@ -210,13 +215,14 @@ class MCPServer:
 - 参数: 无
 
 ### 2. publish_xiaohongshu_note
-- 功能: 发布新笔记
+- 功能: 发布新笔记（支持图文和视频）
 - 参数:
   - title: 笔记标题
   - content: 笔记内容
   - tags: 标签（逗号分隔）
   - location: 位置信息
   - images: 图片路径（逗号分隔多个路径）
+  - videos: 视频路径（逗号分隔多个路径）
 
 ### 3. close_browser
 - 功能: 关闭浏览器

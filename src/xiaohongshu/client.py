@@ -108,8 +108,8 @@ class XHSClient:
             if "publish" not in driver.current_url:
                 raise PublishError("无法访问发布页面，可能需要重新登录", publish_step="页面访问")
             
-            # 处理图片上传
-            await self._handle_image_upload(note)
+            # 处理文件上传（图片/视频）
+            await self._handle_file_upload(note)
             
             # 填写笔记内容
             await self._fill_note_content(note)
@@ -138,6 +138,30 @@ class XHSClient:
                     
         except Exception as e:
             logger.warning(f"⚠️ 处理上传区域时出错: {e}")
+
+    async def _handle_file_upload(self, note: XHSNote) -> None:
+        """统一处理文件上传（图片/视频）"""
+        try:
+            driver = self.browser_manager.driver
+            
+            # 合并图片和视频文件
+            files_to_upload = []
+            if note.images:
+                files_to_upload.extend(note.images)
+                logger.info(f"📸 准备上传 {len(note.images)} 张图片...")
+            if note.videos:
+                files_to_upload.extend(note.videos)
+                logger.info(f"🎬 准备上传 {len(note.videos)} 个视频...")
+            
+            if files_to_upload:
+                upload_input = driver.find_element(By.CSS_SELECTOR, ".upload-input")
+                # 关键：同样的上传逻辑适用于图片和视频
+                upload_input.send_keys('\n'.join(files_to_upload))
+                await asyncio.sleep(1)
+                logger.info("✅ 文件上传指令已发送")
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ 处理文件上传时出错: {e}")
     
     async def _fill_note_content(self, note: XHSNote) -> None:
         """填写笔记内容"""

@@ -5,7 +5,7 @@
 """
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from ..utils.text_utils import validate_note_content, parse_tags_string, parse_file_paths_string
 
 
@@ -15,10 +15,12 @@ class XHSNote(BaseModel):
     title: str
     content: str
     images: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     location: Optional[str] = None
     
-    @validator('title')
+    @field_validator('title')
+    @classmethod
     def validate_title(cls, v):
         """验证标题"""
         if not v or not v.strip():
@@ -27,7 +29,8 @@ class XHSNote(BaseModel):
             raise ValueError("标题长度不能超过50个字符")
         return v.strip()
     
-    @validator('content')
+    @field_validator('content')
+    @classmethod
     def validate_content(cls, v):
         """验证内容"""
         if not v or not v.strip():
@@ -36,7 +39,8 @@ class XHSNote(BaseModel):
             raise ValueError("内容长度不能超过1000个字符")
         return v.strip()
     
-    @validator('images')
+    @field_validator('images')
+    @classmethod
     def validate_images(cls, v):
         """验证图片列表"""
         if v is None:
@@ -56,7 +60,35 @@ class XHSNote(BaseModel):
         
         return v
     
-    @validator('tags')
+    @field_validator('videos')
+    @classmethod
+    def validate_videos(cls, v):
+        """验证视频列表"""
+        if v is None:
+            return v
+        
+        # 小红书只支持单个视频
+        if len(v) > 1:
+            raise ValueError("小红书只支持发布1个视频文件")
+        
+        # 检查路径格式和文件存在性
+        import os
+        for video_path in v:
+            if not os.path.isabs(video_path):
+                raise ValueError(f"视频路径必须是绝对路径: {video_path}")
+            if not os.path.exists(video_path):
+                raise ValueError(f"视频文件不存在: {video_path}")
+            
+            # 检查文件扩展名
+            valid_extensions = ['.mp4', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v']
+            _, ext = os.path.splitext(video_path.lower())
+            if ext not in valid_extensions:
+                raise ValueError(f"不支持的视频格式: {ext}，支持的格式: {valid_extensions}")
+        
+        return v
+    
+    @field_validator('tags')
+    @classmethod
     def validate_tags(cls, v):
         """验证标签列表"""
         if v is None:
@@ -73,9 +105,28 @@ class XHSNote(BaseModel):
         
         return v
     
+    @field_validator('images', 'videos')
+    @classmethod
+    def validate_media_conflict(cls, v, info):
+        """验证图片和视频不能同时存在"""
+        # 在after模式下验证，确保能访问到其他字段
+        return v
+    
+    def __init__(self, **data):
+        """初始化时验证图片和视频冲突"""
+        super().__init__(**data)
+        
+        # 检查图片和视频不能同时存在
+        if self.images and self.videos:
+            raise ValueError("不能同时上传图片和视频，请选择其中一种")
+        
+        # 至少需要图片或视频中的一种
+        if not self.images and not self.videos:
+            raise ValueError("必须上传至少1张图片或1个视频")
+    
     @classmethod
     def from_strings(cls, title: str, content: str, tags_str: str = "", 
-                    location: str = "", images_str: str = "") -> 'XHSNote':
+                    location: str = "", images_str: str = "", videos_str: str = "") -> 'XHSNote':
         """
         从字符串参数创建笔记对象
         
@@ -85,17 +136,20 @@ class XHSNote(BaseModel):
             tags_str: 标签字符串（逗号分隔）
             location: 位置信息
             images_str: 图片路径字符串（逗号分隔）
+            videos_str: 视频路径字符串（逗号分隔）
             
         Returns:
             XHSNote实例
         """
         tag_list = parse_tags_string(tags_str) if tags_str else None
         image_list = parse_file_paths_string(images_str) if images_str else None
+        video_list = parse_file_paths_string(videos_str) if videos_str else None
         
         return cls(
             title=title,
             content=content,
             images=image_list,
+            videos=video_list,
             tags=tag_list,
             location=location if location else None
         )
@@ -111,14 +165,16 @@ class XHSSearchResult(BaseModel):
     url: str
     thumbnail: Optional[str] = None
     
-    @validator('note_id')
+    @field_validator('note_id')
+    @classmethod
     def validate_note_id(cls, v):
         """验证笔记ID"""
         if not v or not v.strip():
             raise ValueError("笔记ID不能为空")
         return v.strip()
     
-    @validator('likes')
+    @field_validator('likes')
+    @classmethod
     def validate_likes(cls, v):
         """验证点赞数"""
         if v < 0:
@@ -136,7 +192,8 @@ class XHSUser(BaseModel):
     following: Optional[int] = None
     notes_count: Optional[int] = None
     
-    @validator('followers', 'following', 'notes_count')
+    @field_validator('followers', 'following', 'notes_count')
+    @classmethod
     def validate_counts(cls, v):
         """验证计数字段"""
         if v is not None and v < 0:
@@ -174,7 +231,8 @@ class CookieInfo(BaseModel):
     secure: bool = False
     expiry: Optional[int] = None
     
-    @validator('name', 'value', 'domain')
+    @field_validator('name', 'value', 'domain')
+    @classmethod
     def validate_required_fields(cls, v):
         """验证必需字段"""
         if not v or not v.strip():
@@ -191,7 +249,8 @@ class CookiesData(BaseModel):
     critical_cookies_found: List[str] = []
     version: str = "2.0"
     
-    @validator('cookies')
+    @field_validator('cookies')
+    @classmethod
     def validate_cookies_list(cls, v):
         """验证cookies列表"""
         if not v:
