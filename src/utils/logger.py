@@ -7,7 +7,7 @@
 import os
 import sys
 import logging
-from typing import Optional
+from typing import Optional, Any
 from loguru import logger
 
 
@@ -91,7 +91,7 @@ class LoggerConfig:
         uvicorn_access_logger = logging.getLogger("uvicorn.access")
         uvicorn_access_logger.addFilter(ASGIErrorFilter())
     
-    def get_logger(self, name: str) -> logger:
+    def get_logger(self, name: str) -> Any:
         """
         获取带有模块名的日志器
         
@@ -127,7 +127,7 @@ def setup_logger(log_level: str = None, log_file: str = None) -> None:
     _logger_config = LoggerConfig(log_level, log_file)
 
 
-def get_logger(name: str = __name__) -> logger:
+def get_logger(name: Optional[str] = None) -> Any:
     """
     获取日志器实例
     
@@ -137,6 +137,9 @@ def get_logger(name: str = __name__) -> logger:
     Returns:
         配置好的日志器
     """
+    if name is None:
+        name = __name__
+        
     if _logger_config is None:
         setup_logger()
     
