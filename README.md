@@ -16,8 +16,13 @@
 ## 📋 功能清单
 
 - [x] **图文发布** - 支持发布图文笔记
-- [x] **视频发布** - 支持发布视频笔记 🆕
+- [x] **视频发布** - 支持发布视频笔记 
 - [ ] **内容搜索** - 支持指定搜索（开发计划中）
+
+## 📋 环境要求
+
+- **浏览器**: Google Chrome 浏览器
+- **驱动**: ChromeDriver (`brew install chromedriver`)
 
 ## 🚀 快速开始
 
@@ -55,10 +60,7 @@ pip install -r requirements.txt
 python xhs_toolkit.py status
 ```
 
-## 📋 环境要求
 
-- **浏览器**: Google Chrome 浏览器
-- **驱动**: ChromeDriver (`brew install chromedriver`)
 
 ## 🛠️ 使用指南
 
@@ -83,13 +85,12 @@ WEBDRIVER_CHROME_DRIVER="/opt/homebrew/bin/chromedriver"
 json_path="./xhs/cookies"
 ```
 
-### 2. 获取登录凭证（改进版本）
+### 2. 获取登录凭证
 
 ```bash
 ./xhs-toolkit cookie save
 ```
 
-**重要改进**：新版本直接获取创作者中心权限cookies，解决跳转失效问题
 
 在弹出的浏览器中：
 1. 登录小红书创作者中心
@@ -103,7 +104,8 @@ json_path="./xhs/cookies"
 ./xhs-toolkit server start
 ```
 
-### 4. 配置Claude Desktop
+### 4. 客户端配置
+**Claude Desktop**
 
 在 `~/.claude_desktop_config.json` 中添加：
 
@@ -122,7 +124,7 @@ json_path="./xhs/cookies"
 }
 ```
 
-### 5. 配置cherry studio
+**cherry studio**
 
 在MCP配置中添加
 
@@ -137,7 +139,7 @@ json_path="./xhs/cookies"
 | 工具名称 | 功能说明 | 参数 | 备注 |
 |---------|----------|------|------|
 | `test_connection` | 测试连接 | 无 | |
-| `start_publish_task` | 启动异步发布任务 ⚡ | title, content, tags, images, videos | **推荐**：解决超时问题 |
+| `start_publish_task` | 启动异步发布任务 ⚡ | title, content, tags, images, videos |  |
 | `check_task_status` | 检查任务状态 | task_id | 配合异步任务使用 |
 | `get_task_result` | 获取任务结果 | task_id | 获取最终发布结果 |
 | `publish_xiaohongshu_note` | 发布笔记（同步） | title, content, tags, images, videos | 视频发布可能超时 |
@@ -153,11 +155,6 @@ json_path="./xhs/cookies"
 2. **检查进度**：`check_task_status("任务ID")`
 3. **获取结果**：`get_task_result("任务ID")`
 
-**优势**：
-- ✅ 每次MCP调用都在10秒内完成，不会超时
-- ✅ 支持实时进度查询（pending→uploading→completed）
-- ✅ 支持长时间视频上传（2-5分钟不受限）
-- ✅ 任务状态持久化，支持断线重连查询
 
 ### 快速发布
 
@@ -180,24 +177,16 @@ python xhs_toolkit.py publish "视频分享" "视频内容描述" --tags "生活
 手工上传过程中，浏览器会弹窗让用户选中文件路径
 告诉ai路径位置，ai会把路径参数对应丢给mcp的参数中，完成上传动作
 
-**智能等待机制** 🆕：
+**智能等待机制** ：
 - **图片上传**：快速上传，无需等待
 - **视频上传**：轮询检测上传进度，等待"上传成功"标识出现
-- **超时保护**：最长等待2分钟，避免MCP调用超时 🔧
-- **状态监控**：实时显示视频文件大小和时长信息
-- **高效轮询**：每2秒检查一次，精确文本匹配 🔧
+- **超时保护**：最长等待2分钟，避免MCP调用超时 
+- **状态监控**：DEBUG模式显示视频文件大小和时长信息
+- **高效轮询**：每2秒检查一次，精确文本匹配 
 
-## 🎯 使用场景
 
-- **内容创作者**: 自动发布（未完成）
-- **市场营销**: 用户分析（未完成）
-- **AI集成**: 与Claude协作创作内容
 
-## 🔐 安全承诺
 
-- ✅ **本地存储**: 所有数据仅保存在本地
-- ✅ **开源透明**: 代码完全开源，可审计
-- ✅ **用户控制**: 您完全控制自己的数据
 
 ## 🛠️ 常用命令
 
@@ -215,7 +204,11 @@ python xhs_toolkit.py publish "视频分享" "视频内容描述" --tags "生活
 ./xhs-toolkit server stop      # 停止服务器
 ./xhs-toolkit server status    # 检查服务器状态
 ```
+## 🔐 安全承诺
 
+- ✅ **本地存储**: 所有数据仅保存在本地
+- ✅ **开源透明**: 代码完全开源，可审计
+- ✅ **用户控制**: 您完全控制自己的数据
 
 ## 📄 许可证
 
