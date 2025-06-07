@@ -161,10 +161,18 @@ jobs:
     - name: 🔨 构建可执行文件
       run: |
         # 确保在项目根目录执行，使用spec文件构建
-        cd ${{ github.workspace }}
-        pyinstaller \
+        pwd
+        ls -la
+        echo "构建前检查文件："
+        ls -la xhs_toolkit.py
+        ls -la .github/xhs_toolkit.spec
+        
+        # 从项目根目录执行PyInstaller
+        python -m PyInstaller \
           --clean \
           --noconfirm \
+          --workpath ./build \
+          --distpath ./dist \
           .github/xhs_toolkit.spec
         
         # 重命名生成的文件以匹配平台
