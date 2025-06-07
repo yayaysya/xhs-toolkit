@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'xhs_toolkit:v1.0.1'
+        description: 'xhs_toolkit:v1.0.2'
         required: true
-        default: 'v1.0.1'
+        default: 'v1.0.2'
         type: string
       release_type:
         description: '发布类型'
@@ -15,7 +15,7 @@ on:
         default: 'patch'
         type: choice
         options:
-        - patch   # 修复版本 (1.0.0 -> 1.0.1)
+        - patch   # 修复版本 (1.0.1 -> 1.0.2)
         - minor   # 功能版本 (1.0.0 -> 1.1.0)
         - major   # 重大版本 (1.0.0 -> 2.0.0)
       release_notes:
@@ -59,13 +59,48 @@ jobs:
     - name: 🔍 代码风格检查
       run: |
         # 跳过长行和一些常见警告
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics \
+          --exclude=__pycache__,*.pyc,build,dist
         
     - name: ✅ 语法检查
       run: |
-        python -m py_compile xhs_mcp_server.py
-        python -m py_compile xhs_toolkit.py  
-        python -m py_compile cookie_helper.py
+        # 检查主入口文件
+        python -m py_compile xhs_toolkit.py
+        
+        # 检查src目录下的所有Python文件
+        find src/ -name "*.py" -type f | while read file; do
+          echo "检查文件: $file"
+          python -m py_compile "$file"
+        done
+        
+    - name: 🧪 模块导入测试
+      run: |
+        # 测试关键模块导入
+        python -c "
+        import sys
+        sys.path.insert(0, '.')
+        
+        # 测试核心模块
+        from src.core.config import XHSConfig
+        from src.core.exceptions import XHSToolkitError
+        from src.core.browser import ChromeDriverManager
+        
+        # 测试认证模块
+        from src.auth.cookie_manager import CookieManager
+        
+        # 测试工具模块
+        from src.utils.logger import get_logger
+        from src.utils.text_utils import safe_print
+        
+        # 测试小红书模块
+        from src.xiaohongshu.models import XHSNote
+        from src.xiaohongshu.client import XHSClient
+        
+        # 测试服务器模块
+        from src.server.mcp_server import MCPServer
+        
+        print('✅ 所有模块导入成功')
+        "
 
   # ============================================
   # 多平台构建
@@ -125,19 +160,21 @@ jobs:
         
     - name: 🔨 构建可执行文件
       run: |
+        # 使用spec文件构建，提供更好的控制
         pyinstaller \
+          --clean \
+          --noconfirm \
           --onefile \
-          --name ${{ matrix.binary_name }} \
-          --add-data "env_example:." \
-          --hidden-import dotenv \
-          --hidden-import selenium \
-          --hidden-import selenium.webdriver \
-          --hidden-import selenium.webdriver.chrome.service \
-          --hidden-import fastmcp \
-          --hidden-import loguru \
-          --hidden-import pydantic \
           --console \
-          xhs_toolkit.py
+          --name ${{ matrix.binary_name }} \
+          .github/xhs_toolkit.spec
+        
+        # 重命名生成的文件
+        if [ -f "dist/xhs-toolkit" ]; then
+          mv dist/xhs-toolkit dist/${{ matrix.binary_name }}
+        elif [ -f "dist/xhs-toolkit.exe" ]; then
+          mv dist/xhs-toolkit.exe dist/${{ matrix.binary_name }}
+        fi
       shell: bash
       
     - name: 🔍 检查构建结果
@@ -265,42 +302,91 @@ jobs:
         VERSION_NO_V="${{ steps.version.outputs.version_no_v }}"
         
         # 根据版本生成特定的更新说明
-        if [ "${VERSION_NO_V}" = "1.0.1" ]; then
+        if [ "${VERSION_NO_V}" = "1.0.2" ]; then
           cat > release-notes.md << 'EOF'
-        ## 🌺 小红书MCP工具包 v1.0.1
+        ## 🌺 小红书MCP工具包 v1.0.2
         
-        > 🔧 **修复版本** - 解决Cookie失效和配置问题
+        > 🏗️ **重构版本** - 全面重构为企业级框架结构
         
-        ### 🐛 Bug修复
+        ### 🎯 重大重构
         
-        - **🍪 修复Cookie失效问题**: 重新定位导航页面为创作者中心，解决跳转时Cookie失效的问题
-        - **🌐 修复域名不匹配**: 将默认域名从 `www.xiaohongshu.com` 改为 `creator.xiaohongshu.com`
-        - **🔧 修复多平台环境变量配置**: 解决Windows/Mac/Linux平台下路径配置问题
-        - **📱 移除手机号验证**: 简化登录流程，完全依赖Cookie认证，不再需要手机号配置
+        - **🏗️ 模块化重构**: 按照SOLID原则重构代码结构，提升可维护性和扩展性
+        - **📁 新目录结构**: 采用标准的src/目录结构，模块职责更清晰
+        - **🔧 统一异常处理**: 实现统一的错误处理边界组件
+        - **⚡ 性能优化**: 异步处理、资源管理、内存优化
         
-        ### ✨ 改进优化
+        ### 📂 新架构特性
         
-        - **🎯 直接访问创作者中心**: 登录时直接打开创作者中心页面，确保获取完整权限
-        - **🔍 智能路径检测**: Chrome和ChromeDriver支持自动检测，减少配置复杂度
-        - **📝 更新配置模板**: 简化 `env_example` 文件，移除不必要的配置项
-        - **🏗️ 改进Cookie格式**: 支持新版Cookie格式，包含版本和域名信息，向下兼容旧格式
+        ```
+        xhs-toolkit/
+        ├── xhs_toolkit.py              # 🚀 主入口（统一CLI）
+        ├── src/                        # 📁 源代码目录
+        │   ├── core/                   # 🔧 核心功能
+        │   │   ├── config.py          # 配置管理
+        │   │   ├── browser.py         # 浏览器管理  
+        │   │   └── exceptions.py      # 异常处理
+        │   ├── auth/                   # 🔐 认证模块
+        │   │   └── cookie_manager.py  # Cookie管理
+        │   ├── xiaohongshu/           # 🌺 平台功能
+        │   │   ├── models.py          # 数据模型
+        │   │   └── client.py          # 小红书客户端
+        │   ├── server/                # 🖥️ MCP服务器
+        │   │   └── mcp_server.py      # MCP服务器
+        │   └── utils/                 # 🛠️ 工具函数
+        │       ├── logger.py          # 日志系统
+        │       └── text_utils.py      # 文本处理
+        ```
         
-        ### 🛠️ 技术改进
+        ### ✨ 新增功能
         
-        - 跨平台Chrome路径自动检测
-        - 环境变量优先级配置系统
-        - 增强的Cookie验证和错误处理
-        - 统一的错误提示和帮助信息
+        - **🔧 配置管理**: 新增配置显示、验证、示例生成功能
+        - **📊 系统状态**: 完整的系统状态检查和诊断
+        - **🛠️ 工具函数**: 统一的文本处理和日志系统
+        - **🔌 编程接口**: 模块化的API，便于二次开发
+        - **🌐 跨平台兼容**: 改进的Windows/macOS/Linux兼容性
         
+        ### 🔄 向后兼容
+        
+        - ✅ **CLI命令保持一致**: 所有原有命令继续可用
+        - ✅ **配置文件兼容**: 支持旧的配置格式
+        - ✅ **Cookie格式兼容**: 支持新旧Cookie格式
+        - ✅ **功能完全保留**: 保持所有原有功能
         
         ### 🚀 快速开始
         
-        1. **下载对应平台的文件**
-        2. **解压到任意目录**  
-        3. **复制配置文件**: `cp env_example .env`
-        4. **编辑配置**: 填入Chrome和ChromeDriver路径（可选，支持自动检测）
-        5. **获取登录凭证**: `./xhs-toolkit cookie save`
-        6. **启动MCP服务**: `./xhs-toolkit server start`
+        ```bash
+        # 查看帮助
+        ./xhs-toolkit --help
+        
+        # Cookie管理
+        ./xhs-toolkit cookie save
+        ./xhs-toolkit cookie show
+        ./xhs-toolkit cookie validate
+        
+        # 配置管理
+        ./xhs-toolkit config show
+        ./xhs-toolkit config validate
+        
+        # 服务器管理
+        ./xhs-toolkit server start
+        ./xhs-toolkit server stop
+        
+        # 系统状态
+        ./xhs-toolkit status
+        
+        # 直接发布
+        ./xhs-toolkit publish "标题" "内容" --tags "标签1,标签2"
+        ```
+        
+        ### 🔧 技术改进
+        
+        - **SOLID原则**: 单一职责、开闭原则、依赖倒置等
+        - **类型提示**: 全面的type hints支持
+        - **异步处理**: async/await异步操作
+        - **资源管理**: 自动清理浏览器资源
+        - **错误处理**: 统一的异常处理系统
+        - **日志系统**: 基于loguru的完整日志
+        - **Unicode兼容**: Windows GBK编码处理
         
         ### 📦 下载说明
         
@@ -310,27 +396,19 @@ jobs:
         | 🪟 Windows | `xhs-toolkit-windows-x64.zip` | 适用于x64 Windows系统 |
         | 🍎 macOS | `xhs-toolkit-macos-x64.tar.gz` | 适用于Intel Mac |
         
-        ### ⚠️ 重要变更
+        ### 💡 开发者改进
         
-        - **不再需要手机号配置**: 删除了 `phone` 配置项，完全依赖Cookie认证
-        - **配置更简单**: Chrome和ChromeDriver支持自动检测，减少手动配置
-        - **Cookie域名变更**: 现在直接获取创作者中心Cookie，解决权限问题
+        - **模块化设计**: 便于扩展和维护
+        - **清晰职责**: 每个模块职责明确
+        - **完整文档**: 代码自文档化
+        - **易于测试**: 模块独立便于单元测试
+        - **配置驱动**: 行为可配置化
         
-        ### 💡 使用要求
-        
-        - **Chrome浏览器**: 必须安装Google Chrome
-        - **ChromeDriver**: 需要安装匹配版本的ChromeDriver
-        - **网络连接**: 需要能够访问小红书网站
-        
-        ### 🔗 相关链接
-        
-        - [📖 完整文档](https://github.com/aki66938/xiaohongshu-mcp-toolkit/blob/main/README.md)
-        - [🐛 问题反馈](https://github.com/aki66938/xiaohongshu-mcp-toolkit/issues)
-        - [💬 讨论交流](https://github.com/aki66938/xiaohongshu-mcp-toolkit/discussions)
+
         
         ---
         
-        **Made with ❤️ for content creators**
+        **🎯 重构目标 100% 达成！代码质量和可维护性显著提升！**
         EOF
         else
           # 通用的发布说明模板
@@ -344,19 +422,21 @@ jobs:
         - 完整的MCP协议支持，与Claude Desktop无缝集成
         - 智能Cookie管理和验证
         - 多平台二进制文件支持
+        - 模块化框架结构，遵循SOLID原则
         
         ### 📋 功能清单
         - [x] **图文发布** - 支持发布文字和图片笔记
         - [x] **Cookie管理** - 安全获取、验证和管理登录凭证
         - [x] **MCP协议支持** - 与AI客户端完美集成
-        - [x] **用户信息** - 获取用户档案和数据分析
+        - [x] **配置管理** - 完整的配置系统
+        - [x] **系统状态** - 系统诊断和状态检查
         - [ ] **视频发布** - 支持发布视频笔记（开发中）
         
         ### 🚀 快速开始
         
         1. **下载对应平台的文件**
         2. **解压到任意目录**
-                 3. **复制配置文件**: \`cp env_example .env\`
+        3. **复制配置文件**: \`cp env_example .env\`
         4. **编辑配置**: 填入Chrome和ChromeDriver路径
         5. **获取登录凭证**: \`./xhs-toolkit cookie save\`
         6. **启动MCP服务**: \`./xhs-toolkit server start\`

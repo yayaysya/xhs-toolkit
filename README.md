@@ -1,6 +1,7 @@
 # 🌺 小红书MCP工具包
 
 [![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
+[![微信公众号](https://example.com/wechat-qrcode.png)](https://weixin.qq.com/r/yourcode)
 
 一个强大的小红书自动化工具包，支持通过MCP协议与AI客户端（如Claude Desktop等）集成，实现智能内容创作和发布。
 
@@ -175,16 +176,6 @@ json_path="./xhs/cookies"
 ./xhs-toolkit server status    # 检查服务器状态
 ```
 
-## ⚠️ 重要提示
-
-- **ASGI错误可忽略**：使用`Ctrl+C`停止服务器时出现的ASGI错误是正常现象，不影响功能
-- **推荐停止方法**：使用`./xhs-toolkit server stop`命令优雅停止服务器
-- **进程清理**：停止时会自动清理ChromeDriver进程
-
-## 🐛 问题反馈
-
-- 查看 [Issues](https://github.com/aki66938/xhs-toolkit/issues)
-- 创建 [新Issue](https://github.com/aki66938/xhs-toolkit/issues/new)
 
 ## 📄 许可证
 

@@ -25,7 +25,7 @@ MANIFEST
 
 # PyInstaller
 *.manifest
-*.spec
+
 
 # 虚拟环境
 venv/
@@ -78,3 +78,6 @@ docs/_build/
 
 # Jupyter Notebook
 .ipynb_checkpoints 
+
+#cookies
+xhs_cookies.json

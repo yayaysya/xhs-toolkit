@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 小红书MCP工具包 - 统一入口
 
@@ -10,406 +11,462 @@ import sys
 import argparse
 import json
 import time
+import asyncio
 from pathlib import Path
 
-# 加载环境变量配置
-from dotenv import load_dotenv
-load_dotenv()  # 加载.env文件
+# 导入重构后的模块
+from src.core.config import XHSConfig
+from src.core.exceptions import XHSToolkitError, format_error_message
+from src.auth.cookie_manager import CookieManager
+from src.server.mcp_server import MCPServer
+from src.xiaohongshu.client import XHSClient
+from src.xiaohongshu.models import XHSNote
+from src.utils.logger import setup_logger, get_logger
+from src.utils.text_utils import safe_print
+
+logger = get_logger(__name__)
 
 def print_banner():
     """打印工具横幅"""
     banner = """
 ╭─────────────────────────────────────────╮
-│          🌺 小红书MCP工具包             │
+│           小红书MCP工具包               │
 │     Xiaohongshu MCP Toolkit v1.0        │
 ╰─────────────────────────────────────────╯
 """
-    print(banner)
+    try:
+        print(banner)
+    except UnicodeEncodeError:
+        # Windows GBK编码兼容性处理
+        simple_banner = """
+==========================================
+          小红书MCP工具包
+    Xiaohongshu MCP Toolkit v1.0
+==========================================
+"""
+        print(simple_banner)
 
-def cookie_command(action):
-    """处理cookie相关命令"""
-    print(f"🍪 执行Cookie操作: {action}")
+def cookie_command(action: str) -> bool:
+    """
+    处理cookie相关命令
     
-    if action == "save":
-        print("📝 注意：新版本直接获取创作者中心权限cookies")
-        print("🔧 这将解决跳转到创作者中心时cookies失效的问题")
+    Args:
+        action: 操作类型 (save, show, validate, test)
+        
+    Returns:
+        操作是否成功
+    """
+    safe_print(f"🍪 执行Cookie操作: {action}")
     
     try:
-        # 直接导入并调用具体函数，更清晰更可靠
-        import cookie_helper
+        # 初始化配置和cookie管理器
+        config = XHSConfig()
+        cookie_manager = CookieManager(config)
         
         if action == "save":
-            result = cookie_helper.save_cookies_interactive()
+            safe_print("📝 注意：新版本直接获取创作者中心权限cookies")
+            safe_print("🔧 这将解决跳转到创作者中心时cookies失效的问题")
+            
+            result = cookie_manager.save_cookies_interactive()
             if result:
-                print("\n🎉 Cookies获取成功！")
-                print("💡 现在可以正常访问创作者中心功能了")
+                safe_print("\n🎉 Cookies获取成功！")
+                safe_print("💡 现在可以正常访问创作者中心功能了")
             return result
+            
         elif action == "show":
-            cookie_helper.load_and_display_cookies()
+            cookie_manager.display_cookies_info()
             return True
+            
         elif action == "validate":
-            result = cookie_helper.validate_cookies()
+            result = cookie_manager.validate_cookies()
             if result:
-                print("✅ Cookies验证通过，可以正常使用创作者功能")
+                safe_print("✅ Cookies验证通过，可以正常使用创作者功能")
             else:
-                print("❌ Cookies验证失败，可能影响创作者中心访问")
-                print("💡 建议重新获取: python cookie_helper.py save")
+                safe_print("❌ Cookies验证失败，可能影响创作者中心访问")
+                safe_print("💡 建议重新获取: python xhs_toolkit.py cookie save")
             return result
+            
+        elif action == "test":
+            safe_print("🧪 测试ChromeDriver配置...")
+            result = cookie_manager.test_chromedriver_config()
+            return result
+            
         else:
-            print(f"❌ 未知操作: {action}")
+            safe_print(f"❌ 未知操作: {action}")
+            safe_print("💡 可用操作: save, show, validate, test")
             return False
             
+    except XHSToolkitError as e:
+        safe_print(f"❌ Cookie操作失败: {format_error_message(e)}")
+        return False
     except Exception as e:
-        print(f"❌ Cookie操作失败: {e}")
+        safe_print(f"❌ Cookie操作出现未知错误: {e}")
         if action == "save":
-            print("💡 常见解决方案:")
-            print("   1. 确保Chrome和ChromeDriver版本兼容")
-            print("   2. 检查网络连接是否正常")
-            print("   3. 确认小红书网站可以正常访问")
+            safe_print("💡 常见解决方案:")
+            safe_print("   1. 确保Chrome和ChromeDriver版本兼容")
+            safe_print("   2. 检查网络连接是否正常")
+            safe_print("   3. 确认小红书网站可以正常访问")
         return False
 
-def server_command(action, port=8000, host="0.0.0.0"):
-    """服务器管理命令"""
+def server_command(action: str, port: int = 3001, host: str = "0.0.0.0") -> bool:
+    """
+    服务器管理命令
+    
+    Args:
+        action: 操作类型 (start, stop, status)
+        port: 服务器端口
+        host: 服务器主机
+        
+    Returns:
+        操作是否成功
+    """
     if action == "start":
-        print("🚀 启动MCP服务器...")
-        os.environ["FASTMCP_SERVER_PORT"] = str(port)
-        os.environ["FASTMCP_SERVER_HOST"] = host
+        safe_print("🚀 启动MCP服务器...")
+        
+        # 设置环境变量
+        os.environ["SERVER_PORT"] = str(port)
+        os.environ["SERVER_HOST"] = host
         
         try:
-            import xhs_mcp_server
-            xhs_mcp_server.main()
+            # 初始化配置和服务器
+            config = XHSConfig()
+            server = MCPServer(config)
+            server.start()
+            return True
+            
         except KeyboardInterrupt:
-            print("👋 服务器已停止")
+            safe_print("👋 服务器已停止")
+            return True
+        except XHSToolkitError as e:
+            safe_print(f"❌ 服务器启动失败: {format_error_message(e)}")
+            return False
         except Exception as e:
-            print(f"❌ 服务器启动失败: {e}")
+            safe_print(f"❌ 服务器启动出现未知错误: {e}")
+            return False
             
     elif action == "stop":
-        print("🛑 正在停止MCP服务器...")
-        import subprocess
-        import signal
+        safe_print("🛑 正在停止MCP服务器...")
         
         try:
+            import subprocess
+            import signal
+            
             # 查找MCP服务器进程
             result = subprocess.run(
-                ["ps", "aux"], 
-                capture_output=True, 
+                ["ps", "aux"] if os.name != 'nt' else ["tasklist"],
+                capture_output=True,
                 text=True
             )
             
             mcp_processes = []
+            search_terms = ['xhs_mcp_server', 'xhs_toolkit.py']
+            
             for line in result.stdout.split('\n'):
-                if 'xhs_mcp_server.py' in line and 'grep' not in line:
+                if any(term in line for term in search_terms) and 'grep' not in line:
                     parts = line.split()
                     if len(parts) > 1:
-                        pid = parts[1]
+                        pid = parts[1] if os.name != 'nt' else parts[1]
                         mcp_processes.append(pid)
             
             if not mcp_processes:
-                print("❌ 未找到运行中的MCP服务器")
-                return
+                safe_print("❌ 未找到运行中的MCP服务器")
+                return False
             
             for pid in mcp_processes:
-                print(f"🔍 找到MCP服务器进程: {pid}")
+                safe_print(f"🔍 找到MCP服务器进程: {pid}")
                 try:
-                    # 发送SIGTERM信号
-                    os.kill(int(pid), signal.SIGTERM)
-                    print(f"📡 已发送停止信号给进程 {pid}")
+                    if os.name == 'nt':  # Windows
+                        subprocess.run(["taskkill", "/F", "/PID", pid], check=True)
+                    else:  # Unix-like
+                        os.kill(int(pid), signal.SIGTERM)
+                        time.sleep(2)
+                        try:
+                            os.kill(int(pid), 0)
+                            os.kill(int(pid), signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
                     
-                    # 等待进程结束
-                    import time
-                    time.sleep(2)
+                    safe_print(f"✅ 进程 {pid} 已停止")
                     
-                    # 检查进程是否还在运行
-                    try:
-                        os.kill(int(pid), 0)  # 检查进程是否存在
-                        print(f"⚠️  进程 {pid} 仍在运行，强制结束...")
-                        os.kill(int(pid), signal.SIGKILL)
-                    except ProcessLookupError:
-                        print(f"✅ 进程 {pid} 已停止")
-                        
-                except (ValueError, ProcessLookupError) as e:
-                    print(f"⚠️  停止进程 {pid} 时出错: {e}")
+                except Exception as e:
+                    safe_print(f"⚠️ 停止进程 {pid} 时出错: {e}")
             
-            # 清理可能残留的ChromeDriver进程
-            print("🧹 清理ChromeDriver进程...")
+            # 清理ChromeDriver进程
+            safe_print("🧹 清理ChromeDriver进程...")
             try:
-                subprocess.run(["pkill", "-f", "chromedriver"], 
-                             capture_output=True, text=True)
+                if os.name == 'nt':
+                    subprocess.run(["taskkill", "/F", "/IM", "chromedriver.exe"], 
+                                 capture_output=True)
+                else:
+                    subprocess.run(["pkill", "-f", "chromedriver"], 
+                                 capture_output=True)
             except:
                 pass
                 
-            print("✅ MCP服务器已停止")
+            safe_print("✅ MCP服务器已停止")
+            return True
             
         except Exception as e:
-            print(f"❌ 停止服务器时出错: {e}")
+            safe_print(f"❌ 停止服务器时出错: {e}")
+            return False
             
     elif action == "status":
-        print("🔍 检查MCP服务器状态...")
-        import subprocess
+        safe_print("🔍 检查MCP服务器状态...")
         
         try:
+            import subprocess
+            
             result = subprocess.run(
-                ["ps", "aux"], 
-                capture_output=True, 
+                ["ps", "aux"] if os.name != 'nt' else ["tasklist"],
+                capture_output=True,
                 text=True
             )
             
             mcp_processes = []
+            search_terms = ['xhs_mcp_server', 'xhs_toolkit.py']
+            
             for line in result.stdout.split('\n'):
-                if 'xhs_mcp_server.py' in line and 'grep' not in line:
+                if any(term in line for term in search_terms) and 'grep' not in line:
                     mcp_processes.append(line.strip())
             
             if mcp_processes:
-                print(f"✅ 找到 {len(mcp_processes)} 个运行中的MCP服务器:")
+                safe_print(f"✅ 找到 {len(mcp_processes)} 个运行中的MCP服务器:")
                 for proc in mcp_processes:
                     parts = proc.split()
                     pid = parts[1] if len(parts) > 1 else "unknown"
                     print(f"   • 进程ID: {pid}")
             else:
-                print("❌ 未找到运行中的MCP服务器")
+                safe_print("❌ 未找到运行中的MCP服务器")
+            
+            return len(mcp_processes) > 0
                 
         except Exception as e:
-            print(f"❌ 检查状态时出错: {e}")
+            safe_print(f"❌ 检查状态时出错: {e}")
+            return False
             
     else:
-        print(f"❌ 未知的服务器操作: {action}")
-        print("💡 可用操作: start, stop, status")
+        safe_print(f"❌ 未知的服务器操作: {action}")
+        safe_print("💡 可用操作: start, stop, status")
+        return False
 
-def publish_command(title, content, tags="", location="", images=""):
-    """直接发布命令"""
-    print(f"📝 发布笔记: {title}")
+async def publish_command(title: str, content: str, tags: str = "", 
+                         location: str = "", images: str = "") -> bool:
+    """
+    直接发布命令
     
-    # 检查服务器是否运行
+    Args:
+        title: 笔记标题
+        content: 笔记内容
+        tags: 标签（逗号分隔）
+        location: 位置信息
+        images: 图片路径（逗号分隔）
+        
+    Returns:
+        发布是否成功
+    """
+    safe_print(f"📝 发布笔记: {title}")
+    
     try:
+        # 检查MCP服务器是否运行
         import requests
-        response = requests.get("http://localhost:8000", timeout=1)
-        print("⚠️  检测到MCP服务器正在运行，建议通过MCP客户端发布")
-    except:
-        print("📱 启动临时发布会话...")
+        try:
+            response = requests.get("http://localhost:3001", timeout=1)
+            safe_print("⚠️ 检测到MCP服务器正在运行，建议通过MCP客户端发布")
+            return False
+        except:
+            pass
         
-        # 导入客户端
-        from xhs_mcp_server import XHSConfig, XHSClient, XHSNote
+        safe_print("📱 启动临时发布会话...")
         
+        # 初始化配置和客户端
         config = XHSConfig()
         client = XHSClient(config)
         
         # 创建笔记对象
-        tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-        image_list = [img.strip() for img in images.split(",") if img.strip()] if images else []
-        
-        note = XHSNote(
+        note = XHSNote.from_strings(
             title=title,
             content=content,
-            images=image_list if image_list else None,
-            tags=tag_list,
-            location=location if location else None
+            tags_str=tags,
+            location=location,
+            images_str=images
         )
         
         # 发布笔记
-        import asyncio
-        result = asyncio.run(client.publish_note(note))
-        print(f"📊 发布结果: {json.dumps(result, ensure_ascii=False, indent=2)}")
-
-def status_command():
-    """显示系统状态"""
-    print("📊 系统状态检查")
-    print("=" * 40)
-    
-    # 检查Chrome
-    chrome_path = os.getenv("CHROME_PATH")
-    if chrome_path:
-        chrome_exists = os.path.exists(chrome_path)
-        print(f"🌐 Chrome浏览器: {'✅ 已安装' if chrome_exists else '❌ 未找到'}")
-        if not chrome_exists:
-            print(f"   配置路径: {chrome_path}")
-    else:
-        # 尝试自动检测Chrome
-        from cookie_helper import _get_default_chrome_path
-        auto_chrome_path = _get_default_chrome_path()
-        if auto_chrome_path:
-            print(f"🌐 Chrome浏览器: ✅ 自动检测到")
-            print(f"   路径: {auto_chrome_path}")
+        result = await client.publish_note(note)
+        
+        if result.success:
+            safe_print(f"✅ 笔记发布成功: {result.message}")
+            if result.final_url:
+                print(f"🔗 页面URL: {result.final_url}")
+            return True
         else:
-            print("🌐 Chrome浏览器: ❌ 未找到")
-            print("   请在.env文件中配置CHROME_PATH")
-    
-    # 检查ChromeDriver
-    chromedriver_path = os.getenv("WEBDRIVER_CHROME_DRIVER")
-    if chromedriver_path:
-        chromedriver_exists = os.path.exists(chromedriver_path)
-        print(f"🚗 ChromeDriver: {'✅ 已安装' if chromedriver_exists else '❌ 未找到'}")
-        if not chromedriver_exists:
-            print(f"   配置路径: {chromedriver_path}")
-    else:
-        # 尝试从PATH中查找
-        import shutil
-        chromedriver_path = shutil.which("chromedriver")
-        if chromedriver_path:
-            print(f"🚗 ChromeDriver: ✅ 在PATH中找到")
-            print(f"   路径: {chromedriver_path}")
-        else:
-            print("🚗 ChromeDriver: ❌ 未找到")
-            print("   请在.env文件中配置WEBDRIVER_CHROME_DRIVER或添加到PATH")
-    
-    # 检查Cookies
-    cookies_file = Path("xhs/cookies/xiaohongshu_cookies.json")
-    cookies_exists = cookies_file.exists()
-    print(f"🍪 Cookies文件: {'✅ 存在' if cookies_exists else '❌ 不存在'}")
-    
-    if cookies_exists:
-        try:
-            with open(cookies_file, 'r', encoding='utf-8') as f:
-                cookies = json.load(f)
-            print(f"   数量: {len(cookies)} 个cookies")
-            
-            # 检查过期时间
-            import time
-            current_time = time.time()
-            expired_count = 0
-            for cookie in cookies:
-                expiry = cookie.get('expiry')
-                if expiry and expiry < current_time:
-                    expired_count += 1
-            
-            if expired_count > 0:
-                print(f"   ⚠️  {expired_count} 个cookies已过期")
-            else:
-                print("   ✅ 所有cookies有效")
-                
-        except Exception as e:
-            print(f"   ❌ 读取失败: {e}")
-    
-    # 检查MCP服务器状态
-    try:
-        import requests
-        response = requests.get("http://localhost:8000", timeout=1)
-        print("🖥️  MCP服务器: ✅ 正在运行")
-    except:
-        print("🖥️  MCP服务器: ⏹️  未运行")
-    
-    # 环境建议
-    print("\n💡 环境建议:")
-    if not chrome_exists:
-        print("   • 请安装Google Chrome浏览器")
-    if not chromedriver_exists:
-        print("   • 请运行: brew install chromedriver")
-    if not cookies_exists:
-        print("   • 请运行: python xhs_toolkit.py cookie save")
-
-def check_environment():
-    """检查运行环境"""
-    print("🔍 检查运行环境...")
-    
-    # 检查.env文件
-    env_file = Path(".env")
-    if not env_file.exists():
-        print("❌ .env配置文件不存在")
-        print("💡 请先创建.env文件:")
-        print("   1. cp env_example.txt .env")
-        print("   2. 编辑.env文件，填入您的配置")
-        print("   3. 必需配置: CHROME_PATH, WEBDRIVER_CHROME_DRIVER")
-        return False
-    
-    print("✅ .env文件存在")
-    
-    # 检查必需的环境变量
-    required_vars = {
-        "CHROME_PATH": "Chrome浏览器路径",
-        "WEBDRIVER_CHROME_DRIVER": "ChromeDriver路径"
-    }
-    
-    missing_vars = []
-    for var, desc in required_vars.items():
-        value = os.getenv(var)
-        if not value:
-            missing_vars.append(f"{var} ({desc})")
-        elif var in ["CHROME_PATH", "WEBDRIVER_CHROME_DRIVER"] and not os.path.exists(value):
-            print(f"❌ {desc}不存在: {value}")
+            safe_print(f"❌ 笔记发布失败: {result.message}")
             return False
-        else:
-            print(f"✅ {desc}: {value}")
-    
-    if missing_vars:
-        print("❌ 缺少必需的环境变量:")
-        for var in missing_vars:
-            print(f"   • {var}")
-        print("💡 请在.env文件中配置这些变量")
+            
+    except XHSToolkitError as e:
+        safe_print(f"❌ 发布失败: {format_error_message(e)}")
         return False
+    except Exception as e:
+        safe_print(f"❌ 发布出现未知错误: {e}")
+        return False
+
+def config_command(action: str) -> bool:
+    """
+    配置管理命令
     
-    # 检查Cookies目录
-    cookies_path = os.getenv("json_path", "./xhs/cookies")
-    cookies_file = Path(cookies_path) / "xiaohongshu_cookies.json"
-    if not cookies_file.exists():
-        print("⚠️  Cookies文件不存在，请先运行: ./xhs-toolkit cookie save")
-    else:
-        print("✅ Cookies文件存在")
-    
-    return True
+    Args:
+        action: 操作类型 (show, validate, example)
+        
+    Returns:
+        操作是否成功
+    """
+    try:
+        config = XHSConfig()
+        
+        if action == "show":
+            safe_print("🔧 当前配置信息:")
+            print("=" * 50)
+            config_dict = config.to_dict()
+            for key, value in config_dict.items():
+                print(f"{key}: {value}")
+            return True
+            
+        elif action == "validate":
+            safe_print("🔍 验证配置...")
+            validation = config.validate_config()
+            
+            if validation["valid"]:
+                safe_print("✅ 配置验证通过")
+                return True
+            else:
+                safe_print("❌ 配置验证失败:")
+                for issue in validation["issues"]:
+                    print(f"   • {issue}")
+                return False
+                
+        elif action == "example":
+            safe_print("📄 生成配置示例文件...")
+            config.save_env_example()
+            safe_print("✅ 已生成 env_example 文件")
+            safe_print("💡 请复制为 .env 文件并根据需要修改配置")
+            return True
+            
+        else:
+            safe_print(f"❌ 未知操作: {action}")
+            safe_print("💡 可用操作: show, validate, example")
+            return False
+            
+    except XHSToolkitError as e:
+        safe_print(f"❌ 配置操作失败: {format_error_message(e)}")
+        return False
+    except Exception as e:
+        safe_print(f"❌ 配置操作出现未知错误: {e}")
+        return False
+
+def status_command() -> bool:
+    """显示系统状态"""
+    try:
+        safe_print("📊 系统状态检查:")
+        print("=" * 50)
+        
+        # 配置状态
+        config = XHSConfig()
+        validation = config.validate_config()
+        
+        safe_print(f"🔧 配置状态: {'✅ 正常' if validation['valid'] else '❌ 有问题'}")
+        if not validation["valid"]:
+            for issue in validation["issues"]:
+                print(f"   • {issue}")
+        
+        # Cookies状态
+        cookie_manager = CookieManager(config)
+        cookies = cookie_manager.load_cookies()
+        safe_print(f"🍪 Cookies状态: {'✅ 已加载' if cookies else '❌ 未找到'} ({len(cookies)} 个)")
+        
+        # 服务器状态
+        server_running = server_command("status")
+        safe_print(f"🚀 MCP服务器: {'✅ 运行中' if server_running else '❌ 未运行'}")
+        
+        # 系统信息
+        import platform
+        safe_print(f"💻 操作系统: {platform.system()} {platform.release()}")
+        safe_print(f"🐍 Python版本: {platform.python_version()}")
+        
+        return validation["valid"]
+        
+    except Exception as e:
+        safe_print(f"❌ 状态检查失败: {e}")
+        return False
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(
-        description='小红书MCP工具包 - 统一管理cookies和MCP服务器',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例用法:
-  python xhs_toolkit.py status                    # 检查系统状态
-  python xhs_toolkit.py cookie save               # 获取cookies
-  python xhs_toolkit.py cookie validate           # 验证cookies
-  python xhs_toolkit.py server start              # 启动MCP服务器
-  python xhs_toolkit.py publish "标题" "内容"      # 快速发布笔记
-        """
-    )
+    """主入口函数"""
+    print_banner()
     
-    subparsers = parser.add_subparsers(dest='command', help='可用命令')
+    # 设置日志
+    setup_logger()
     
-    # 状态命令
-    subparsers.add_parser('status', help='显示系统状态')
+    parser = argparse.ArgumentParser(description="小红书MCP工具包")
+    subparsers = parser.add_subparsers(dest="command", help="可用命令")
     
-    # Cookie相关命令
-    cookie_parser = subparsers.add_parser('cookie', help='Cookie管理')
-    cookie_parser.add_argument('action', choices=['save', 'show', 'validate'], 
-                              help='Cookie操作: save(获取), show(显示), validate(验证)')
+    # Cookie管理命令
+    cookie_parser = subparsers.add_parser("cookie", help="Cookie管理")
+    cookie_parser.add_argument("action", choices=["save", "show", "validate", "test"], 
+                              help="操作类型")
     
-    # 服务器命令
-    server_parser = subparsers.add_parser('server', help='MCP服务器管理')
-    server_parser.add_argument('action', choices=['start', 'stop', 'status'], help='服务器操作')
-    server_parser.add_argument('--port', default=8000, type=int, help='服务器端口 (默认8000)')
-    server_parser.add_argument('--host', default="0.0.0.0", help='服务器主机 (默认0.0.0.0)')
+    # 服务器管理命令
+    server_parser = subparsers.add_parser("server", help="MCP服务器管理")
+    server_parser.add_argument("action", choices=["start", "stop", "status"], 
+                              help="操作类型")
+    server_parser.add_argument("--port", type=int, default=3001, help="服务器端口")
+    server_parser.add_argument("--host", default="0.0.0.0", help="服务器主机")
     
     # 发布命令
-    publish_parser = subparsers.add_parser('publish', help='快速发布笔记')
-    publish_parser.add_argument('title', help='笔记标题')
-    publish_parser.add_argument('content', help='笔记内容')
-    publish_parser.add_argument('--tags', default="", help='标签 (逗号分隔)')
-    publish_parser.add_argument('--location', default="", help='位置信息')
-    publish_parser.add_argument('--images', default="", help='图片路径 (逗号分隔)')
+    publish_parser = subparsers.add_parser("publish", help="发布笔记")
+    publish_parser.add_argument("title", help="笔记标题")
+    publish_parser.add_argument("content", help="笔记内容")
+    publish_parser.add_argument("--tags", default="", help="标签（逗号分隔）")
+    publish_parser.add_argument("--location", default="", help="位置信息")
+    publish_parser.add_argument("--images", default="", help="图片路径（逗号分隔）")
+    
+    # 配置管理命令
+    config_parser = subparsers.add_parser("config", help="配置管理")
+    config_parser.add_argument("action", choices=["show", "validate", "example"], 
+                              help="操作类型")
+    
+    # 状态检查命令
+    subparsers.add_parser("status", help="显示系统状态")
     
     args = parser.parse_args()
     
-    # 如果没有提供命令，显示帮助
     if not args.command:
-        print_banner()
         parser.print_help()
         return
     
-    print_banner()
-    
     try:
-        if args.command == 'status':
-            status_command()
-        elif args.command == 'cookie':
-            cookie_command(args.action)
-        elif args.command == 'server':
-            server_command(args.action, args.port, args.host)
-        elif args.command == 'publish':
-            publish_command(args.title, args.content, args.tags, args.location, args.images)
+        success = False
+        
+        if args.command == "cookie":
+            success = cookie_command(args.action)
+        elif args.command == "server":
+            success = server_command(args.action, args.port, args.host)
+        elif args.command == "publish":
+            success = asyncio.run(publish_command(
+                args.title, args.content, args.tags, args.location, args.images
+            ))
+        elif args.command == "config":
+            success = config_command(args.action)
+        elif args.command == "status":
+            success = status_command()
+        
+        sys.exit(0 if success else 1)
+        
     except KeyboardInterrupt:
-        print("\n👋 再见！")
+        safe_print("\n👋 操作已取消")
+        sys.exit(1)
     except Exception as e:
-        print(f"❌ 执行失败: {e}")
-        import traceback
-        traceback.print_exc()
+        safe_print(f"❌ 程序执行出错: {e}")
+        logger.exception("程序执行异常")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 
