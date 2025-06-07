@@ -160,20 +160,27 @@ jobs:
         
     - name: 🔨 构建可执行文件
       run: |
-        # 使用spec文件构建，提供更好的控制
+        # 使用spec文件构建，所有配置都在spec文件中定义
         pyinstaller \
           --clean \
           --noconfirm \
-          --onefile \
-          --console \
-          --name ${{ matrix.binary_name }} \
           .github/xhs_toolkit.spec
         
-        # 重命名生成的文件
-        if [ -f "dist/xhs-toolkit" ]; then
-          mv dist/xhs-toolkit dist/${{ matrix.binary_name }}
-        elif [ -f "dist/xhs-toolkit.exe" ]; then
-          mv dist/xhs-toolkit.exe dist/${{ matrix.binary_name }}
+        # 重命名生成的文件以匹配平台
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          # Windows平台应该生成.exe文件
+          if [ -f "dist/xhs-toolkit.exe" ]; then
+            mv dist/xhs-toolkit.exe dist/${{ matrix.binary_name }}
+          elif [ -f "dist/xhs-toolkit" ]; then
+            mv dist/xhs-toolkit dist/${{ matrix.binary_name }}
+          fi
+        else
+          # Linux和macOS平台
+          if [ -f "dist/xhs-toolkit" ]; then
+            mv dist/xhs-toolkit dist/${{ matrix.binary_name }}
+          elif [ -f "dist/xhs-toolkit.exe" ]; then
+            mv dist/xhs-toolkit.exe dist/${{ matrix.binary_name }}
+          fi
         fi
       shell: bash
       
