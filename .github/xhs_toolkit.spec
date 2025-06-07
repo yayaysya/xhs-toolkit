@@ -4,18 +4,14 @@ import sys
 import os
 from pathlib import Path
 
-# 获取项目根目录（spec文件在.github子目录下）
-project_root = Path(__file__).parent.parent
-os.chdir(project_root)
-
 # 添加src目录到Python路径
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, 'src')
 
 # 收集src目录下的所有模块
 def collect_src_modules():
     """收集src目录下的所有Python模块"""
     modules = []
-    src_path = project_root / 'src'
+    src_path = Path('src')
     
     for py_file in src_path.rglob('*.py'):
         if py_file.name != '__init__.py':
@@ -63,16 +59,16 @@ hidden_imports = [
     *collect_src_modules()
 ]
 
-# 数据文件（使用绝对路径）
+# 数据文件
 datas = [
-    (str(project_root / 'env_example'), '.'),
-    (str(project_root / 'src'), 'src'),
-    (str(project_root / 'README.md'), '.'),
-    (str(project_root / 'LICENSE'), '.'),
+    ('env_example', '.'),
+    ('src', 'src'),
+    ('README.md', '.'),
+    ('LICENSE', '.'),
 ]
 
 a = Analysis(
-    [str(project_root / 'xhs_toolkit.py')],
+    ['xhs_toolkit.py'],
     pathex=[],
     binaries=[],
     datas=datas,

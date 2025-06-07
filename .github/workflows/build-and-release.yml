@@ -160,7 +160,8 @@ jobs:
         
     - name: 🔨 构建可执行文件
       run: |
-        # 使用spec文件构建，所有配置都在spec文件中定义
+        # 确保在项目根目录执行，使用spec文件构建
+        cd ${{ github.workspace }}
         pyinstaller \
           --clean \
           --noconfirm \
