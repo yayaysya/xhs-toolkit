@@ -4,22 +4,13 @@ on:
   # 手动触发工作流
   workflow_dispatch:
     inputs:
-      version:
-        description: 'xhs_toolkit:v1.0.2'
-        required: true
-        default: 'v1.0.2'
-        type: string
-      release_type:
-        description: '发布类型'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-        - patch   # 修复版本 (1.0.1 -> 1.0.2)
-        - minor   # 功能版本 (1.0.0 -> 1.1.0)
-        - major   # 重大版本 (1.0.0 -> 2.0.0)
-      release_notes:
-        description: '发布说明（可选，将追加到自动生成的说明后）'
+      use_custom_notes:
+        description: '使用自定义发布说明'
+        required: false
+        default: false
+        type: boolean
+      additional_notes:
+        description: '额外发布说明（可选，将追加到RELEASE_NOTES.md后）'
         required: false
         default: ''
         type: string
@@ -230,17 +221,28 @@ jobs:
     - name: 🏷️ 设置版本信息
       id: version
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.version }}"
-          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+        # 从version.txt读取版本号
+        if [ -f "version.txt" ]; then
+          VERSION_NO_V=$(cat version.txt | tr -d '\n\r' | xargs)
+          echo "📄 从version.txt读取版本: $VERSION_NO_V"
         else
-          VERSION="${{ github.ref_name }}"
-          RELEASE_TYPE="patch"
+          echo "❌ version.txt文件不存在"
+          exit 1
         fi
         
+        # 确保版本号以v开头
+        if [[ $VERSION_NO_V == v* ]]; then
+          VERSION=$VERSION_NO_V
+          VERSION_NO_V=${VERSION#v}
+        else
+          VERSION="v$VERSION_NO_V"
+        fi
+        
+        echo "🏷️ 最终版本号: $VERSION"
+        echo "📝 版本号（无v）: $VERSION_NO_V"
+        
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "release_type=${RELEASE_TYPE}" >> $GITHUB_OUTPUT
-        echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
+        echo "version_no_v=${VERSION_NO_V}" >> $GITHUB_OUTPUT
       
     - name: 📥 下载所有构建产物
       uses: actions/download-artifact@v4
@@ -314,170 +316,27 @@ jobs:
       id: release_notes
       run: |
         VERSION="${{ steps.version.outputs.version }}"
-        RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
-        VERSION_NO_V="${{ steps.version.outputs.version_no_v }}"
         
-        # 根据版本生成特定的更新说明
-        if [ "${VERSION_NO_V}" = "1.0.2" ]; then
-          cat > release-notes.md << 'EOF'
-        ## 🌺 小红书MCP工具包 v1.0.2
+        echo "📝 准备发布说明..."
         
-        > 🏗️ **重构版本** - 全面重构为企业级框架结构
-        
-        ### 🎯 重大重构
-        
-        - **🏗️ 模块化重构**: 按照SOLID原则重构代码结构，提升可维护性和扩展性
-        - **📁 新目录结构**: 采用标准的src/目录结构，模块职责更清晰
-        - **🔧 统一异常处理**: 实现统一的错误处理边界组件
-        - **⚡ 性能优化**: 异步处理、资源管理、内存优化
-        
-        ### 📂 新架构特性
-        
-        ```
-        xhs-toolkit/
-        ├── xhs_toolkit.py              # 🚀 主入口（统一CLI）
-        ├── src/                        # 📁 源代码目录
-        │   ├── core/                   # 🔧 核心功能
-        │   │   ├── config.py          # 配置管理
-        │   │   ├── browser.py         # 浏览器管理  
-        │   │   └── exceptions.py      # 异常处理
-        │   ├── auth/                   # 🔐 认证模块
-        │   │   └── cookie_manager.py  # Cookie管理
-        │   ├── xiaohongshu/           # 🌺 平台功能
-        │   │   ├── models.py          # 数据模型
-        │   │   └── client.py          # 小红书客户端
-        │   ├── server/                # 🖥️ MCP服务器
-        │   │   └── mcp_server.py      # MCP服务器
-        │   └── utils/                 # 🛠️ 工具函数
-        │       ├── logger.py          # 日志系统
-        │       └── text_utils.py      # 文本处理
-        ```
-        
-        ### ✨ 新增功能
-        
-        - **🔧 配置管理**: 新增配置显示、验证、示例生成功能
-        - **📊 系统状态**: 完整的系统状态检查和诊断
-        - **🛠️ 工具函数**: 统一的文本处理和日志系统
-        - **🔌 编程接口**: 模块化的API，便于二次开发
-        - **🌐 跨平台兼容**: 改进的Windows/macOS/Linux兼容性
-        
-        ### 🔄 向后兼容
-        
-        - ✅ **CLI命令保持一致**: 所有原有命令继续可用
-        - ✅ **配置文件兼容**: 支持旧的配置格式
-        - ✅ **Cookie格式兼容**: 支持新旧Cookie格式
-        - ✅ **功能完全保留**: 保持所有原有功能
-        
-        ### 🚀 快速开始
-        
-        ```bash
-        # 查看帮助
-        ./xhs-toolkit --help
-        
-        # Cookie管理
-        ./xhs-toolkit cookie save
-        ./xhs-toolkit cookie show
-        ./xhs-toolkit cookie validate
-        
-        # 配置管理
-        ./xhs-toolkit config show
-        ./xhs-toolkit config validate
-        
-        # 服务器管理
-        ./xhs-toolkit server start
-        ./xhs-toolkit server stop
-        
-        # 系统状态
-        ./xhs-toolkit status
-        
-        # 直接发布
-        ./xhs-toolkit publish "标题" "内容" --tags "标签1,标签2"
-        ```
-        
-        ### 🔧 技术改进
-        
-        - **SOLID原则**: 单一职责、开闭原则、依赖倒置等
-        - **类型提示**: 全面的type hints支持
-        - **异步处理**: async/await异步操作
-        - **资源管理**: 自动清理浏览器资源
-        - **错误处理**: 统一的异常处理系统
-        - **日志系统**: 基于loguru的完整日志
-        - **Unicode兼容**: Windows GBK编码处理
-        
-        ### 📦 下载说明
-        
-        | 平台 | 文件 | 说明 |
-        |------|------|------|
-        | 🐧 Linux | `xhs-toolkit-linux-x64.tar.gz` | 适用于x64 Linux系统 |
-        | 🪟 Windows | `xhs-toolkit-windows-x64.zip` | 适用于x64 Windows系统 |
-        | 🍎 macOS | `xhs-toolkit-macos-x64.tar.gz` | 适用于Intel Mac |
-        
-        ### 💡 开发者改进
-        
-        - **模块化设计**: 便于扩展和维护
-        - **清晰职责**: 每个模块职责明确
-        - **完整文档**: 代码自文档化
-        - **易于测试**: 模块独立便于单元测试
-        - **配置驱动**: 行为可配置化
-        
-
-        
-        ---
-        
-        **🎯 重构目标 100% 达成！代码质量和可维护性显著提升！**
-        EOF
+        # 检查是否存在.github/workflows/RELEASE_NOTES.md
+        if [ -f ".github/workflows/RELEASE_NOTES.md" ]; then
+          echo "📄 使用.github/workflows/RELEASE_NOTES.md作为发布说明"
+          cp .github/workflows/RELEASE_NOTES.md release-notes.md
         else
-          # 通用的发布说明模板
-          cat > release-notes.md << EOF
-        ## 🌺 小红书MCP工具包 ${VERSION}
-        
-        > 📦 **${RELEASE_TYPE} 版本发布**
-        
-        ### ✨ 主要特性
-        - 支持小红书图文笔记自动发布
-        - 完整的MCP协议支持，与Claude Desktop无缝集成
-        - 智能Cookie管理和验证
-        - 多平台二进制文件支持
-        - 模块化框架结构，遵循SOLID原则
-        
-        ### 📋 功能清单
-        - [x] **图文发布** - 支持发布文字和图片笔记
-        - [x] **Cookie管理** - 安全获取、验证和管理登录凭证
-        - [x] **MCP协议支持** - 与AI客户端完美集成
-        - [x] **配置管理** - 完整的配置系统
-        - [x] **系统状态** - 系统诊断和状态检查
-        - [ ] **视频发布** - 支持发布视频笔记（开发中）
-        
-        ### 🚀 快速开始
-        
-        1. **下载对应平台的文件**
-        2. **解压到任意目录**
-        3. **复制配置文件**: \`cp env_example .env\`
-        4. **编辑配置**: 填入Chrome和ChromeDriver路径
-        5. **获取登录凭证**: \`./xhs-toolkit cookie save\`
-        6. **启动MCP服务**: \`./xhs-toolkit server start\`
-        
-        ### 📦 下载说明
-        
-        | 平台 | 文件 | 说明 |
-        |------|------|------|
-        | 🐧 Linux | \`xhs-toolkit-linux-x64.tar.gz\` | 适用于x64 Linux系统 |
-        | 🪟 Windows | \`xhs-toolkit-windows-x64.zip\` | 适用于x64 Windows系统 |
-        | 🍎 macOS | \`xhs-toolkit-macos-x64.tar.gz\` | 适用于Intel Mac |
-        
-        ---
-        
-        **Made with ❤️ for content creators**
-        EOF
+          echo "📝 未找到发布说明文件，使用版本号作为发布说明"
+          echo "## 小红书MCP工具包 ${VERSION}" > release-notes.md
         fi
         
         # 如果手动输入了额外的发布说明，追加到文件末尾
-        if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+        if [ -n "${{ github.event.inputs.additional_notes }}" ]; then
           echo "" >> release-notes.md
-          echo "### 📝 其他说明" >> release-notes.md
+          echo "### 额外说明" >> release-notes.md
           echo "" >> release-notes.md
-          echo "${{ github.event.inputs.release_notes }}" >> release-notes.md
+          echo "${{ github.event.inputs.additional_notes }}" >> release-notes.md
         fi
+        
+        echo "✅ 发布说明准备完成"
         
     - name: 🎉 创建GitHub Release
       uses: ncipollo/release-action@v1

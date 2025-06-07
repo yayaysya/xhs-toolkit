@@ -35,6 +35,9 @@ hidden_imports = [
     'platform',
     'subprocess',
     'signal',
+    'uuid',  # 新增：异步任务ID生成
+    'socket',  # 新增：网络功能
+    'dataclasses',  # 新增：任务数据类
     
     # 第三方库
     'dotenv',
@@ -48,12 +51,15 @@ hidden_imports = [
     'selenium.common.exceptions',
     'fastmcp',
     'fastmcp.server',
+    'fastmcp.utilities',  # 新增：FastMCP工具类
     'loguru',
     'pydantic',
     'pydantic.dataclasses',
     'DrissionPage',
     'DrissionPage.chromium',
     'requests',
+    'aiohttp',  # 新增：异步HTTP客户端
+    'asyncio.exceptions',  # 新增：异步异常处理
     
     # 收集src目录下的所有模块
     *collect_src_modules()
