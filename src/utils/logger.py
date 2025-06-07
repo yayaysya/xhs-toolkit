@@ -137,8 +137,6 @@ def get_logger(name: str = __name__) -> logger:
     Returns:
         配置好的日志器
     """
-    global _logger_config
-    
     if _logger_config is None:
         setup_logger()
     
