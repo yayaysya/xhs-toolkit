@@ -31,6 +31,12 @@ class XHSConfig:
     def _load_environment_variables(self) -> None:
         """加载环境变量配置"""
         try:
+            # 检查.env文件是否存在
+            if not os.path.exists(self.env_file_path):
+                print(f"⚠️ 未找到配置文件: {self.env_file_path}")
+                print("💡 程序将使用默认配置运行，建议创建配置文件以实现自定义设置")
+                print()
+            
             # 加载.env文件
             load_dotenv(self.env_file_path)
         except Exception as e:
@@ -47,7 +53,7 @@ class XHSConfig:
         
         # 服务器配置
         self.server_host = os.getenv("SERVER_HOST", "0.0.0.0")
-        self.server_port = int(os.getenv("SERVER_PORT", "3001"))
+        self.server_port = int(os.getenv("SERVER_PORT", "8000"))
         
         # 文件路径配置
         self.cookies_file = os.getenv("COOKIES_FILE", "xhs_cookies.json")
@@ -200,7 +206,7 @@ WEBDRIVER_CHROME_DRIVER={self.chromedriver_path or "自动检测"}
 
 # MCP服务器配置
 SERVER_HOST=0.0.0.0
-SERVER_PORT=3001
+SERVER_PORT=8000
 
 # Cookies文件路径
 COOKIES_FILE=xhs_cookies.json
