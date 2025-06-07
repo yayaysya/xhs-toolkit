@@ -10,7 +10,10 @@ import asyncio
 import signal
 import sys
 import socket
+import uuid
+import time
 from typing import Dict, Any
+from dataclasses import dataclass, asdict
 
 from fastmcp import FastMCP
 
@@ -21,6 +24,88 @@ from ..xiaohongshu.models import XHSNote
 from ..utils.logger import get_logger, setup_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class PublishTask:
+    """发布任务数据类"""
+    task_id: str
+    status: str  # "pending", "uploading", "filling", "publishing", "completed", "failed"
+    note: XHSNote
+    progress: int  # 0-100
+    message: str
+    result: Dict[str, Any] = None
+    start_time: float = None
+    end_time: float = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        data = asdict(self)
+        # 移除note对象，避免序列化问题
+        if 'note' in data:
+            data['note_title'] = self.note.title
+            data['note_has_images'] = bool(self.note.images)
+            data['note_has_videos'] = bool(self.note.videos)
+            del data['note']
+        return data
+
+
+class TaskManager:
+    """任务管理器"""
+    
+    def __init__(self):
+        self.tasks: Dict[str, PublishTask] = {}
+        self.running_tasks: Dict[str, asyncio.Task] = {}
+    
+    def create_task(self, note: XHSNote) -> str:
+        """创建新任务"""
+        task_id = str(uuid.uuid4())[:8]  # 使用短ID
+        task = PublishTask(
+            task_id=task_id,
+            status="pending",
+            note=note,
+            progress=0,
+            message="任务已创建，准备开始",
+            start_time=time.time()
+        )
+        self.tasks[task_id] = task
+        logger.info(f"📋 创建新任务: {task_id} - {note.title}")
+        return task_id
+    
+    def get_task(self, task_id: str) -> PublishTask:
+        """获取任务"""
+        return self.tasks.get(task_id)
+    
+    def update_task(self, task_id: str, status: str = None, progress: int = None, message: str = None, result: Dict = None):
+        """更新任务状态"""
+        if task_id in self.tasks:
+            task = self.tasks[task_id]
+            if status:
+                task.status = status
+            if progress is not None:
+                task.progress = progress
+            if message:
+                task.message = message
+            if result:
+                task.result = result
+            if status in ["completed", "failed"]:
+                task.end_time = time.time()
+            logger.info(f"📋 更新任务 {task_id}: {status} ({progress}%) - {message}")
+    
+    def remove_old_tasks(self, max_age_seconds: int = 3600):
+        """移除超过指定时间的旧任务"""
+        current_time = time.time()
+        expired_tasks = []
+        for task_id, task in self.tasks.items():
+            if task.end_time and (current_time - task.end_time) > max_age_seconds:
+                expired_tasks.append(task_id)
+        
+        for task_id in expired_tasks:
+            del self.tasks[task_id]
+            if task_id in self.running_tasks:
+                self.running_tasks[task_id].cancel()
+                del self.running_tasks[task_id]
+            logger.info(f"🗑️ 清理过期任务: {task_id}")
 
 
 class MCPServer:
@@ -36,6 +121,7 @@ class MCPServer:
         self.config = config
         self.xhs_client = XHSClient(config)
         self.mcp = FastMCP("小红书MCP服务器")
+        self.task_manager = TaskManager()  # 添加任务管理器
         self._setup_tools()
         self._setup_resources()
         self._setup_prompts()
@@ -77,28 +163,26 @@ class MCPServer:
                 return error_msg
         
         @self.mcp.tool()
-        async def publish_xiaohongshu_note(title: str, content: str, tags: str = "", 
-                                         location: str = "", images: str = "", videos: str = "") -> str:
+        async def start_publish_task(title: str, content: str, tags: str = "", 
+                                   location: str = "", images: str = "", videos: str = "") -> str:
             """
-            发布小红书笔记
+            启动异步发布任务（解决MCP超时问题）
             
             Args:
                 title (str): 笔记标题，例如："今日分享"
                 content (str): 笔记内容，例如："今天去了一个很棒的地方"
                 tags (str, optional): 标签，用逗号分隔，例如："生活,旅行,美食"
                 location (str, optional): 位置信息，例如："北京"
-                images (str, optional): 图片文件路径，用逗号分隔，例如："/Volumes/xhs-files/image1.jpg,/Volumes/xhs-files/image2.jpg"
-                videos (str, optional): 视频文件路径，用逗号分隔，例如："/Volumes/xhs-files/video1.mp4"
+                images (str, optional): 图片文件路径，用逗号分隔
+                videos (str, optional): 视频文件路径，用逗号分隔
             
             Returns:
-                str: 发布结果的JSON字符串
-                
-            Example:
-                title="今日美食", content="推荐一家好吃的餐厅", tags="美食,生活", images="/Volumes/xhs-files/food.jpg"
+                str: 任务ID和状态信息
             """
-            logger.info(f"📝 开始发布小红书笔记: 标题='{title}', 标签='{tags}', 位置='{location}', 图片='{images}', 视频='{videos}'")
+            logger.info(f"🚀 启动异步发布任务: 标题='{title}', 标签='{tags}', 位置='{location}', 图片='{images}', 视频='{videos}'")
             
             try:
+                # 创建笔记对象
                 note = XHSNote.from_strings(
                     title=title,
                     content=content,
@@ -108,33 +192,112 @@ class MCPServer:
                     videos_str=videos
                 )
                 
-                if note.images:
-                    logger.info(f"📸 处理图片路径: {note.images}")
-                if note.videos:
-                    logger.info(f"🎬 处理视频路径: {note.videos}")
-                logger.info("📱 正在初始化浏览器...")
+                # 创建异步任务
+                task_id = self.task_manager.create_task(note)
                 
-                result = await self.xhs_client.publish_note(note)
-                logger.info(f"✅ 发布笔记完成: {result.success}")
+                # 启动后台任务
+                async_task = asyncio.create_task(self._execute_publish_task(task_id))
+                self.task_manager.running_tasks[task_id] = async_task
                 
-                return json.dumps(result.to_dict(), ensure_ascii=False, indent=2)
+                result = {
+                    "success": True,
+                    "task_id": task_id,
+                    "message": f"发布任务已启动，任务ID: {task_id}",
+                    "next_step": f"请使用 check_task_status('{task_id}') 查看进度"
+                }
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
                 
             except Exception as e:
-                error_msg = f"发布笔记失败: {str(e)}"
+                error_msg = f"启动发布任务失败: {str(e)}"
                 logger.error(f"❌ {error_msg}")
-                
-                if isinstance(e, XHSToolkitError):
-                    return json.dumps({
-                        "success": False,
-                        "message": format_error_message(e),
-                        "error_type": e.error_code
-                    }, ensure_ascii=False, indent=2)
-                else:
-                    return json.dumps({
-                        "success": False,
-                        "message": error_msg,
-                        "error_type": "UNKNOWN_ERROR"
-                    }, ensure_ascii=False, indent=2)
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg
+                }, ensure_ascii=False, indent=2)
+        
+        @self.mcp.tool()
+        async def check_task_status(task_id: str) -> str:
+            """
+            检查发布任务状态
+            
+            Args:
+                task_id (str): 任务ID
+            
+            Returns:
+                str: 任务状态信息
+            """
+            logger.info(f"📊 检查任务状态: {task_id}")
+            
+            task = self.task_manager.get_task(task_id)
+            if not task:
+                return json.dumps({
+                    "success": False,
+                    "message": f"任务 {task_id} 不存在"
+                }, ensure_ascii=False, indent=2)
+            
+            # 计算运行时间
+            elapsed_time = 0
+            if task.start_time:
+                elapsed_time = int(time.time() - task.start_time)
+            
+            result = {
+                "success": True,
+                "task_id": task_id,
+                "status": task.status,
+                "progress": task.progress,
+                "message": task.message,
+                "elapsed_seconds": elapsed_time,
+                "is_completed": task.status in ["completed", "failed"]
+            }
+            
+            # 如果任务完成，包含结果
+            if task.result:
+                result["result"] = task.result
+            
+            return json.dumps(result, ensure_ascii=False, indent=2)
+        
+        @self.mcp.tool()
+        async def get_task_result(task_id: str) -> str:
+            """
+            获取已完成任务的结果
+            
+            Args:
+                task_id (str): 任务ID
+            
+            Returns:
+                str: 任务结果信息
+            """
+            logger.info(f"📋 获取任务结果: {task_id}")
+            
+            task = self.task_manager.get_task(task_id)
+            if not task:
+                return json.dumps({
+                    "success": False,
+                    "message": f"任务 {task_id} 不存在"
+                }, ensure_ascii=False, indent=2)
+            
+            if task.status not in ["completed", "failed"]:
+                return json.dumps({
+                    "success": False,
+                    "message": f"任务 {task_id} 尚未完成，当前状态: {task.status}",
+                    "current_status": task.status,
+                    "progress": task.progress
+                }, ensure_ascii=False, indent=2)
+            
+            # 返回完整结果
+            result = {
+                "success": task.status == "completed",
+                "task_id": task_id,
+                "status": task.status,
+                "message": task.message,
+                "execution_time": int(task.end_time - task.start_time) if task.end_time and task.start_time else 0
+            }
+            
+            if task.result:
+                result["publish_result"] = task.result
+            
+            return json.dumps(result, ensure_ascii=False, indent=2)
         
         @self.mcp.tool()
         async def close_browser() -> str:
@@ -192,6 +355,86 @@ class MCPServer:
             logger.info(f"✅ 测试完成: {result}")
             return json.dumps(result, ensure_ascii=False, indent=2)
     
+    async def _execute_publish_task(self, task_id: str) -> None:
+        """
+        执行发布任务的后台逻辑
+        
+        Args:
+            task_id: 任务ID
+        """
+        task = self.task_manager.get_task(task_id)
+        if not task:
+            logger.error(f"❌ 任务 {task_id} 不存在")
+            return
+        
+        try:
+            # 阶段1：初始化浏览器
+            self.task_manager.update_task(task_id, status="initializing", progress=10, message="正在初始化浏览器...")
+            
+            # 创建新的客户端实例，避免并发冲突
+            client = XHSClient(self.config)
+            
+            # 阶段2：上传文件
+            if task.note.images or task.note.videos:
+                self.task_manager.update_task(task_id, status="uploading", progress=20, message="正在上传文件...")
+                
+                # 执行发布过程
+                result = await client.publish_note(task.note)
+                
+                if result.success:
+                    self.task_manager.update_task(
+                        task_id, 
+                        status="completed", 
+                        progress=100, 
+                        message="发布成功！",
+                        result=result.to_dict()
+                    )
+                else:
+                    self.task_manager.update_task(
+                        task_id, 
+                        status="failed", 
+                        progress=0, 
+                        message=f"发布失败: {result.message}",
+                        result=result.to_dict()
+                    )
+            else:
+                # 没有文件的快速发布
+                self.task_manager.update_task(task_id, status="publishing", progress=60, message="正在发布笔记...")
+                
+                result = await client.publish_note(task.note)
+                
+                if result.success:
+                    self.task_manager.update_task(
+                        task_id, 
+                        status="completed", 
+                        progress=100, 
+                        message="发布成功！",
+                        result=result.to_dict()
+                    )
+                else:
+                    self.task_manager.update_task(
+                        task_id, 
+                        status="failed", 
+                        progress=0, 
+                        message=f"发布失败: {result.message}",
+                        result=result.to_dict()
+                    )
+                
+        except Exception as e:
+            error_msg = f"任务执行失败: {str(e)}"
+            logger.error(f"❌ 任务 {task_id} 执行失败: {e}")
+            self.task_manager.update_task(
+                task_id, 
+                status="failed", 
+                progress=0, 
+                message=error_msg,
+                result={"success": False, "message": error_msg}
+            )
+        finally:
+            # 清理运行任务记录
+            if task_id in self.task_manager.running_tasks:
+                del self.task_manager.running_tasks[task_id]
+
     def _setup_resources(self) -> None:
         """设置MCP资源"""
         
@@ -214,8 +457,8 @@ class MCPServer:
 - 功能: 测试MCP连接
 - 参数: 无
 
-### 2. publish_xiaohongshu_note
-- 功能: 发布新笔记（支持图文和视频）
+### 2. start_publish_task
+- 功能: 启动异步发布任务（解决MCP超时问题）
 - 参数:
   - title: 笔记标题
   - content: 笔记内容
@@ -224,10 +467,20 @@ class MCPServer:
   - images: 图片路径（逗号分隔多个路径）
   - videos: 视频路径（逗号分隔多个路径）
 
-### 3. close_browser
+### 3. check_task_status
+- 功能: 检查发布任务状态
+- 参数:
+  - task_id: 任务ID
+
+### 4. get_task_result
+- 功能: 获取已完成任务的结果
+- 参数:
+  - task_id: 任务ID
+
+### 5. close_browser
 - 功能: 关闭浏览器
 
-### 4. test_publish_params
+### 6. test_publish_params
 - 功能: 测试发布参数解析（调试用）
 - 参数:
   - title: 测试标题
@@ -356,7 +609,9 @@ class MCPServer:
         
         logger.info("🎯 MCP工具列表:")
         logger.info("   • test_connection - 测试连接")
-        logger.info("   • publish_xiaohongshu_note - 发布笔记")
+        logger.info("   • start_publish_task - 启动异步发布任务")
+        logger.info("   • check_task_status - 检查任务状态")
+        logger.info("   • get_task_result - 获取任务结果")
         logger.info("   • close_browser - 关闭浏览器")
         logger.info("   • test_publish_params - 测试参数")
         
