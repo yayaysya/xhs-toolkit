@@ -131,6 +131,12 @@ json_path="./xhs/cookies"
 ![Cherry Studio配置](src/static/cherrystudio.png)
 
 
+**n8n**
+
+在n8n的AI agent节点的tool中添加配置配置
+
+![n8n的AI agent配置](src/static/n8n_mcp.png)
+
 
 ## 🔧 主要功能
 
