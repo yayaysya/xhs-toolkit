@@ -20,6 +20,7 @@ LOG_FILE=xhs_toolkit.log
 # 浏览器选项
 DISABLE_IMAGES=false
 DEBUG_MODE=false
+# 无头浏览器模式（true=启用无头模式，false=显示浏览器界面）
 HEADLESS=false
 
 # 超时设置（秒）

@@ -87,6 +87,13 @@ class ChromeDriverManager:
         chrome_options.add_argument('--disable-renderer-backgrounding')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
         
+        # 无头模式配置
+        if self.config.headless:
+            chrome_options.add_argument('--headless')
+            logger.info("🔒 启用无头浏览器模式")
+        else:
+            logger.info("🖥️ 启用有界面浏览器模式")
+        
         # 设置Chrome可执行文件路径
         if self.config.chrome_path:
             chrome_options.binary_location = self.config.chrome_path

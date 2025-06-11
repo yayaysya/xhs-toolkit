@@ -66,9 +66,9 @@ class XHSConfig:
         # 浏览器选项
         self.disable_images = os.getenv("DISABLE_IMAGES", "false").lower() == "true"
         self.debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+        self.headless = os.getenv("HEADLESS", "false").lower() == "true"  # 无头浏览器模式
         
         # 其他配置
-        self.headless = os.getenv("HEADLESS", "false").lower() == "true"
         self.timeout = int(os.getenv("TIMEOUT", "30"))
     
     def _get_chrome_path(self) -> str:
@@ -218,6 +218,7 @@ LOG_FILE=xhs_toolkit.log
 # 浏览器选项
 DISABLE_IMAGES=false
 DEBUG_MODE=false
+# 无头浏览器模式（true=启用无头模式，false=显示浏览器界面）
 HEADLESS=false
 
 # 超时设置（秒）
