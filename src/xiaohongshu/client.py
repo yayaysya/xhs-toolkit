@@ -108,6 +108,9 @@ class XHSClient:
             if "publish" not in driver.current_url:
                 raise PublishError("无法访问发布页面，可能需要重新登录", publish_step="页面访问")
             
+            # 根据内容类型切换发布模式
+            await self._switch_publish_mode(note)
+            
             # 处理文件上传（图片/视频）
             await self._handle_file_upload(note)
             
@@ -123,6 +126,68 @@ class XHSClient:
                 raise
             else:
                 raise PublishError(f"发布流程执行失败: {str(e)}", publish_step="流程执行") from e
+
+    async def _switch_publish_mode(self, note: XHSNote) -> None:
+        """根据笔记内容类型切换发布模式（图文/视频）"""
+        try:
+            driver = self.browser_manager.driver
+            
+            # 判断内容类型
+            has_images = note.images and len(note.images) > 0
+            has_videos = note.videos and len(note.videos) > 0
+            
+            if has_images:
+                logger.info("🔄 切换到图文发布模式...")
+                # 查找"上传图文"选项卡
+                try:
+                    # 查找所有creator-tab元素
+                    tabs = driver.find_elements(By.CSS_SELECTOR, ".creator-tab")
+                    image_tab = None
+                    
+                    for tab in tabs:
+                        if tab.is_displayed() and "上传图文" in tab.text:
+                            # 确保元素在可见区域内（不是负坐标）
+                            rect = tab.rect
+                            if rect['x'] > 0 and rect['y'] > 0:
+                                image_tab = tab
+                                break
+                    
+                    if image_tab:
+                        image_tab.click()
+                        logger.info("✅ 已切换到图文发布模式")
+                        await asyncio.sleep(2)  # 等待界面切换完成
+                    else:
+                        logger.warning("⚠️ 未找到图文发布选项卡，可能已经在图文模式")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ 切换图文模式时出错: {e}，继续执行...")
+                    
+            elif has_videos:
+                logger.info("🔄 切换到视频发布模式...")
+                # 页面默认就是视频模式，检查是否需要切换
+                try:
+                    tabs = driver.find_elements(By.CSS_SELECTOR, ".creator-tab")
+                    video_tab = None
+                    
+                    for tab in tabs:
+                        if tab.is_displayed() and "上传视频" in tab.text:
+                            rect = tab.rect
+                            if rect['x'] > 0 and rect['y'] > 0:
+                                video_tab = tab
+                                break
+                    
+                    if video_tab and "active" not in video_tab.get_attribute("class"):
+                        video_tab.click()
+                        logger.info("✅ 已切换到视频发布模式")
+                        await asyncio.sleep(2)
+                    else:
+                        logger.info("✅ 已在视频发布模式")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ 切换视频模式时出错: {e}，继续执行...")
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ 模式切换过程出错: {e}，继续执行...")
 
     async def _handle_file_upload(self, note: XHSNote) -> None:
         """统一处理文件上传（图片/视频）"""
