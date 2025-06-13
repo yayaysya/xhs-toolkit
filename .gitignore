@@ -83,7 +83,7 @@ docs/_build/
 xhs_cookies.json
 
 # 数据
-data/
+data/creator_db/
 
 # 其他
 .cursorrules

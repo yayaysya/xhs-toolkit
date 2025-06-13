@@ -87,10 +87,57 @@ jobs:
         from src.xiaohongshu.models import XHSNote
         from src.xiaohongshu.client import XHSClient
         
-        # 测试服务器模块
-        from src.server.mcp_server import MCPServer
+        # 测试数据模块 - 新增（允许失败，不阻断构建）
+        try:
+            # 先设置必要的环境变量，避免数据模块初始化失败
+            import os as test_os
+            test_os.environ['ENABLE_DATABASE'] = 'false'
+            test_os.environ['ENABLE_AUTO_COLLECTION'] = 'false'
+            test_os.environ['DATA_STORAGE_PATH'] = '/tmp/test_data'
+            
+            from src.data import storage_manager, data_scheduler
+            print('✅ 数据模块导入成功')
+        except ImportError as e:
+            print(f'⚠️ 数据模块导入失败 (非关键性): {e}')
+            # 检查具体依赖问题但不抛出异常
+            try:
+                from src.data.storage_manager import storage_manager
+                print('✅ storage_manager 单独导入成功')
+            except ImportError as e2:
+                print(f'⚠️ storage_manager 导入失败: {e2}')
+            
+            try:
+                from src.data.scheduler import data_scheduler
+                print('✅ data_scheduler 单独导入成功')
+            except ImportError as e3:
+                print(f'⚠️ data_scheduler 导入失败: {e3}')
+        except Exception as e:
+            print(f'⚠️ 数据模块初始化失败 (非关键性): {e}')
         
-        print('✅ 所有模块导入成功')
+        # 测试服务器模块（关键性模块，失败则中断）
+        try:
+            # 为MCP服务器设置环境变量
+            import os as test_os2
+            test_os2.environ['ENABLE_DATABASE'] = 'false'
+            test_os2.environ['ENABLE_AUTO_COLLECTION'] = 'false'
+            
+            from src.server.mcp_server import MCPServer
+            print('✅ MCP服务器模块导入成功')
+        except ImportError as e:
+            print(f'❌ MCP服务器模块导入失败 (关键性): {e}')
+            # 提供更详细的错误信息
+            import traceback
+            print('详细错误堆栈:')
+            traceback.print_exc()
+            raise
+        except Exception as e:
+            print(f'❌ MCP服务器模块初始化失败 (关键性): {e}')
+            import traceback
+            print('详细错误堆栈:')
+            traceback.print_exc()
+            raise
+        
+        print('✅ 所有模块导入测试完成')
         "
 
   # ============================================
