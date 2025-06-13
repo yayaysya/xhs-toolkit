@@ -285,7 +285,12 @@ COLLECTION_SCHEDULE=0 9 * * 1-5
 COLLECTION_SCHEDULE=0 2 1 * *
 ```
 
-详细配置说明请参考：[调度器配置指南](docs/scheduler_configuration.md)
+采用cron语法
+
+### 版本演示截图(V1.2.0)
+
+![xhs_toolkit版本测试V1.2.0](src/static/cherrystudio_test_1.2.0.png)
+
 
 ## 🛠️ 常用命令
 
