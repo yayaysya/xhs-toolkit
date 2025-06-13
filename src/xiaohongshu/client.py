@@ -6,6 +6,7 @@
 
 import asyncio
 import time
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 import requests
 from selenium.webdriver.common.by import By
@@ -653,6 +654,208 @@ class XHSClient:
             
         except Exception as e:
             raise PublishError(f"提交发布失败: {str(e)}", publish_step="提交发布") from e
+
+
+    # ==================== 数据采集功能 ====================
+    
+    @handle_exception
+    async def collect_creator_data(self, date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        采集创作者数据中心的全部核心数据
+        
+        Args:
+            date: 采集日期，默认当天
+            
+        Returns:
+            结构化数据字典，包含账号概览、内容分析、粉丝数据
+        """
+        from .data_collector import collect_dashboard_data, collect_content_analysis_data, collect_fans_data
+        
+        logger.info("📊 开始采集创作者数据中心数据...")
+        
+        try:
+            # 创建浏览器驱动
+            driver = self.browser_manager.create_driver()
+            
+            # 加载cookies
+            cookies = self.cookie_manager.load_cookies()
+            cookie_result = self.browser_manager.load_cookies(cookies)
+            logger.info(f"🍪 Cookies加载结果: {cookie_result}")
+            
+            # 采集结果
+            result = {
+                "success": True,
+                "collect_time": datetime.now().isoformat(),
+                "date": date or datetime.now().strftime("%Y-%m-%d"),
+                "data": {}
+            }
+            
+            try:
+                # 采集账号概览数据
+                logger.info("🏠 开始采集账号概览数据...")
+                dashboard_data = collect_dashboard_data(driver, date)
+                result["data"]["dashboard"] = dashboard_data
+                
+                # 等待间隔，遵守采集规范
+                await asyncio.sleep(3)
+                
+                # 采集内容分析数据
+                logger.info("📊 开始采集内容分析数据...")
+                content_data = collect_content_analysis_data(driver, date)
+                result["data"]["content_analysis"] = content_data
+                
+                # 等待间隔
+                await asyncio.sleep(3)
+                
+                # 采集粉丝数据
+                logger.info("👥 开始采集粉丝数据...")
+                fans_data = collect_fans_data(driver, date)
+                result["data"]["fans"] = fans_data
+                
+                logger.info("✅ 创作者数据采集完成")
+                
+            except Exception as e:
+                logger.error(f"❌ 数据采集过程出错: {e}")
+                result["success"] = False
+                result["error"] = str(e)
+                
+        except Exception as e:
+            logger.error(f"❌ 初始化数据采集环境失败: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            # 确保浏览器被关闭
+            self.browser_manager.close_driver()
+        
+        return result
+    
+    @handle_exception
+    async def collect_dashboard_data(self, date: Optional[str] = None, save_data: bool = True) -> Dict[str, Any]:
+        """
+        采集账号概览数据
+        
+        Args:
+            date: 采集日期，默认当天
+            save_data: 是否保存数据到存储
+            
+        Returns:
+            账号概览数据字典
+        """
+        from .data_collector.dashboard import collect_dashboard_data
+        
+        logger.info("🏠 开始采集账号概览数据...")
+        
+        try:
+            driver = self.browser_manager.create_driver()
+            cookies = self.cookie_manager.load_cookies()
+            self.browser_manager.load_cookies(cookies)
+            
+            result = await collect_dashboard_data(driver, date, save_data)
+            
+        except Exception as e:
+            logger.error(f"❌ 采集账号概览数据失败: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            self.browser_manager.close_driver()
+        
+        return result
+    
+    @handle_exception
+    async def collect_content_analysis_data(self, date: Optional[str] = None, 
+                                               limit: int = 50, save_data: bool = True) -> Dict[str, Any]:
+        """
+        采集内容分析数据
+        
+        Args:
+            date: 采集日期，默认当天
+            limit: 最大采集笔记数量
+            save_data: 是否保存数据到存储
+            
+        Returns:
+            内容分析数据字典
+        """
+        from .data_collector.content_analysis import collect_content_analysis_data
+        
+        logger.info("📊 开始采集内容分析数据...")
+        
+        try:
+            driver = self.browser_manager.create_driver()
+            cookies = self.cookie_manager.load_cookies()
+            self.browser_manager.load_cookies(cookies)
+            
+            result = await collect_content_analysis_data(driver, date, limit, save_data)
+            
+        except Exception as e:
+            logger.error(f"❌ 采集内容分析数据失败: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            self.browser_manager.close_driver()
+        
+        return result
+    
+    @handle_exception
+    async def collect_fans_data(self, date: Optional[str] = None, save_data: bool = True) -> Dict[str, Any]:
+        """
+        采集粉丝数据
+        
+        Args:
+            date: 采集日期，默认当天
+            save_data: 是否保存数据到存储
+            
+        Returns:
+            粉丝数据字典
+        """
+        from .data_collector.fans import collect_fans_data
+        
+        logger.info("👥 开始采集粉丝数据...")
+        
+        try:
+            driver = self.browser_manager.create_driver()
+            cookies = self.cookie_manager.load_cookies()
+            self.browser_manager.load_cookies(cookies)
+            
+            result = await collect_fans_data(driver, date, save_data)
+            
+        except Exception as e:
+            logger.error(f"❌ 采集粉丝数据失败: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            self.browser_manager.close_driver()
+        
+        return result
+    
+    @handle_exception
+    async def collect_note_detail_data(self, note_title: str) -> Dict[str, Any]:
+        """
+        采集单篇笔记的详细数据
+        
+        Args:
+            note_title: 笔记标题（用于定位）
+            
+        Returns:
+            笔记详细数据字典
+        """
+        from .data_collector.content_analysis import collect_note_detail_data
+        
+        logger.info(f"📋 开始采集笔记详细数据: {note_title}")
+        
+        try:
+            driver = self.browser_manager.create_driver()
+            cookies = self.cookie_manager.load_cookies()
+            self.browser_manager.load_cookies(cookies)
+            
+            # 先访问内容分析页面
+            driver.get("https://creator.xiaohongshu.com/statistics/data-analysis")
+            await asyncio.sleep(3)
+            
+            result = collect_note_detail_data(driver, note_title)
+            
+        except Exception as e:
+            logger.error(f"❌ 采集笔记详细数据失败: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            self.browser_manager.close_driver()
+        
+        return result
 
 
 # 便捷函数

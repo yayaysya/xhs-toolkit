@@ -22,6 +22,7 @@ from ..core.exceptions import format_error_message, XHSToolkitError
 from ..xiaohongshu.client import XHSClient
 from ..xiaohongshu.models import XHSNote
 from ..utils.logger import get_logger, setup_logger
+from ..data import storage_manager, data_scheduler
 
 logger = get_logger(__name__)
 
@@ -122,9 +123,51 @@ class MCPServer:
         self.xhs_client = XHSClient(config)
         self.mcp = FastMCP("小红书MCP服务器")
         self.task_manager = TaskManager()  # 添加任务管理器
+        self.scheduler_initialized = False  # 调度器初始化标志
         self._setup_tools()
         self._setup_resources()
         self._setup_prompts()
+    
+    async def _initialize_data_collection(self) -> None:
+        """初始化数据采集功能"""
+        try:
+            logger.info("📊 初始化数据采集功能...")
+            
+            # 初始化存储管理器
+            storage_manager.initialize()
+            storage_info = storage_manager.get_storage_info()
+            logger.info(f"💾 存储配置: {storage_info['storage_types']}")
+            
+            # 检查是否启用自动采集
+            enable_auto_collection = os.getenv('ENABLE_AUTO_COLLECTION', 'false').lower() == 'true'
+            
+            if enable_auto_collection:
+                # 初始化调度器
+                data_scheduler.initialize(self.xhs_client)
+                
+                # 启动调度器
+                await data_scheduler.start()
+                
+                if data_scheduler.is_running():
+                    job_info = data_scheduler.get_job_info()
+                    logger.info("⏰ 数据采集调度器已启动")
+                    
+                    # 显示下次执行时间
+                    if job_info.get('jobs'):
+                        for job in job_info['jobs']:
+                            next_run = job.get('next_run_time')
+                            if next_run:
+                                logger.info(f"📅 下次采集时间: {next_run}")
+                else:
+                    logger.warning("⚠️ 调度器启动失败")
+            else:
+                logger.info("📊 自动数据采集已禁用")
+                
+            self.scheduler_initialized = True
+            
+        except Exception as e:
+            logger.error(f"❌ 数据采集功能初始化失败: {e}")
+            self.scheduler_initialized = False
     
     def _setup_tools(self) -> None:
         """设置MCP工具"""
@@ -145,6 +188,13 @@ class MCPServer:
                 # 检查配置
                 config_status = self.config.to_dict()
                 config_status["current_time"] = current_time
+                
+                # 添加数据采集状态
+                config_status["data_collection"] = {
+                    "scheduler_initialized": self.scheduler_initialized,
+                    "auto_collection_enabled": os.getenv('ENABLE_AUTO_COLLECTION', 'false').lower() == 'true',
+                    "storage_info": storage_manager.get_storage_info() if self.scheduler_initialized else None
+                }
                 
                 logger.info(f"✅ 连接测试完成: {config_status}")
                 
@@ -354,6 +404,64 @@ class MCPServer:
             
             logger.info(f"✅ 测试完成: {result}")
             return json.dumps(result, ensure_ascii=False, indent=2)
+        
+        @self.mcp.tool()
+        async def get_creator_data_analysis() -> str:
+            """
+            获取创作者数据用于分析
+            
+            Returns:
+                str: 包含所有创作者数据的详细信息用于数据分析
+            """
+            logger.info("📊 获取创作者数据用于分析")
+            
+            try:
+                if not self.scheduler_initialized:
+                    return json.dumps({
+                        "success": False,
+                        "message": "数据采集功能未初始化"
+                    }, ensure_ascii=False, indent=2)
+                
+                # 获取存储管理器
+                csv_storage = storage_manager.get_csv_storage()
+                
+                # 读取所有数据
+                dashboard_data = await csv_storage.get_latest_data('dashboard', limit=100)
+                content_data = await csv_storage.get_latest_data('content_analysis', limit=100)
+                fans_data = await csv_storage.get_latest_data('fans', limit=100)
+                
+                # 获取存储信息
+                storage_info = storage_manager.get_storage_info()
+                
+                result = {
+                    "success": True,
+                    "message": "创作者数据获取成功，可用于分析",
+                    "data_summary": {
+                        "dashboard_records": len(dashboard_data),
+                        "content_records": len(content_data),
+                        "fans_records": len(fans_data),
+                        "storage_info": storage_info
+                    },
+                    "dashboard_data": dashboard_data,
+                    "content_analysis_data": content_data,
+                    "fans_data": fans_data,
+                    "analysis_tips": {
+                        "dashboard": "仪表板数据包含账号整体表现指标",
+                        "content": "内容分析数据包含每篇笔记的详细表现",
+                        "fans": "粉丝数据包含粉丝增长趋势"
+                    },
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                }
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
+                
+            except Exception as e:
+                error_msg = f"获取创作者数据失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg
+                }, ensure_ascii=False, indent=2)
     
     async def _execute_publish_task(self, task_id: str) -> None:
         """
@@ -548,6 +656,12 @@ class MCPServer:
             logger.info("👋 收到停止信号，正在优雅关闭服务器...")
             # 清理资源
             try:
+                # 停止数据采集调度器
+                if self.scheduler_initialized and data_scheduler.is_running():
+                    logger.info("🧹 停止数据采集调度器...")
+                    asyncio.run(data_scheduler.stop())
+                
+                # 清理浏览器实例
                 if hasattr(self.xhs_client, 'browser_manager') and self.xhs_client.browser_manager.is_initialized:
                     logger.info("🧹 清理残留的浏览器实例...")
                     self.xhs_client.browser_manager.close_driver()
@@ -614,9 +728,16 @@ class MCPServer:
         logger.info("   • get_task_result - 获取任务结果")
         logger.info("   • close_browser - 关闭浏览器")
         logger.info("   • test_publish_params - 测试参数")
+        logger.info("   • get_creator_data_analysis - 获取创作者数据分析")
         
         logger.info("🔧 按 Ctrl+C 停止服务器")
         logger.info("💡 终止时的ASGI错误信息是正常现象，可以忽略")
+        
+        # 初始化数据采集功能
+        try:
+            asyncio.run(self._initialize_data_collection())
+        except Exception as e:
+            logger.warning(f"⚠️ 数据采集功能初始化失败: {e}")
         
         try:
             # 使用FastMCP内置的run方法
@@ -630,6 +751,12 @@ class MCPServer:
         finally:
             # 清理资源
             try:
+                # 停止数据采集调度器
+                if self.scheduler_initialized and data_scheduler.is_running():
+                    logger.info("🧹 停止数据采集调度器...")
+                    asyncio.run(data_scheduler.stop())
+                
+                # 清理浏览器实例
                 if hasattr(self.xhs_client, 'browser_manager') and self.xhs_client.browser_manager.is_initialized:
                     logger.info("🧹 清理残留的浏览器实例...")
                     self.xhs_client.browser_manager.close_driver()

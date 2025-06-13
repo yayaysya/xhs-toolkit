@@ -81,3 +81,11 @@ docs/_build/
 
 #cookies
 xhs_cookies.json
+
+# 数据
+data/
+
+# 其他
+.cursorrules
+.cursorignore
+.cursorignore

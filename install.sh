@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "🌺 小红书MCP工具包 - 快速安装脚本"
-echo "=================================="
+echo "🌺 小红书MCP工具包 v1.2.0 - 快速安装脚本"
+echo "============================================"
 
 # 检查操作系统
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -44,7 +44,7 @@ fi
 # 创建.env文件
 echo "📝 创建配置文件..."
 if [ ! -f ".env" ]; then
-    cp env_example.txt .env
+    cp env_example .env
     
     # 替换默认路径
     sed -i.bak "s|CHROME_PATH=.*|CHROME_PATH=\"$CHROME_PATH\"|g" .env
@@ -55,6 +55,11 @@ if [ ! -f ".env" ]; then
 else
     echo "✅ 配置文件已存在"
 fi
+
+# 创建数据目录
+echo "📁 创建数据目录..."
+mkdir -p data/creator_db
+echo "✅ 数据目录已创建: data/creator_db/"
 
 # 安装Python依赖（如果是源码方式）
 if [ -f "requirements.txt" ] && command -v pip &> /dev/null; then
@@ -69,5 +74,10 @@ echo ""
 echo "📋 下一步："
 echo "1. 运行: ./xhs-toolkit cookie save"
 echo "2. 运行: ./xhs-toolkit server start"
+echo ""
+echo "🆕 v1.2.0 新功能："
+echo "📊 数据采集与AI分析功能已启用"
+echo "📁 数据将保存在 data/creator_db/ 目录"
+echo "🤖 AI可通过 get_creator_data_analysis 工具分析您的账号数据"
 echo ""
 echo "💡 更多帮助: ./xhs-toolkit --help" 
