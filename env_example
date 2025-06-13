@@ -26,17 +26,17 @@ HEADLESS=false
 # 超时设置（秒）
 TIMEOUT=30
 
-# ==================== 数据存储配置 ====================
+# ==================== 数据存储配置(暂不支持) ====================
 # 是否启用PostgreSQL数据库存储（false=仅使用CSV存储，true=同时使用PostgreSQL）
-ENABLE_DATABASE=false
+; ENABLE_DATABASE=false
 
-# PostgreSQL数据库连接配置（仅在ENABLE_DATABASE=true时生效）
-DATABASE_URL=postgresql://username:password@localhost:5432/xhs_toolkit
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=xhs_toolkit
-DATABASE_USER=username
-DATABASE_PASSWORD=password
+# PostgreSQL数据库连接配置
+; DATABASE_URL=postgresql://username:password@localhost:5432/xhs_toolkit
+; DATABASE_HOST=localhost
+; DATABASE_PORT=5432
+; DATABASE_NAME=xhs_toolkit
+; DATABASE_USER=username
+; DATABASE_PASSWORD=password
 
 # CSV数据存储路径（本地存储始终启用）
 DATA_STORAGE_PATH=data
