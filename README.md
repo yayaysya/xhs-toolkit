@@ -240,21 +240,7 @@ COLLECT_CONTENT_ANALYSIS=true   # 是否采集内容分析数据
 COLLECT_FANS=true               # 是否采集粉丝数据
 ```
 
-#### 使用示例
 
-```bash
-# 运行数据采集示例
-python examples/data_collection_example.py
-
-# 仅手动采集
-python examples/data_collection_example.py --mode manual
-
-# 启用调度器演示
-python examples/data_collection_example.py --mode scheduler
-
-# 启用数据库存储
-python examples/data_collection_example.py --enable-db
-```
 
 #### 采集的数据类型
 
