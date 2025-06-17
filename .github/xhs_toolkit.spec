@@ -61,6 +61,12 @@ hidden_imports = [
     'aiohttp',  # 新增：异步HTTP客户端
     'asyncio.exceptions',  # 新增：异步异常处理
     
+    # 数据处理库 - 项目实际使用
+    'pandas',
+    'numpy',  # pandas的依赖
+    'pytz',   # pandas的时区处理依赖
+    'dateutil',  # pandas的日期处理依赖
+    
     # 收集src目录下的所有模块
     *collect_src_modules()
 ]
@@ -86,8 +92,8 @@ a = Analysis(
         # 排除不需要的模块以减小文件大小
         'tkinter',
         'matplotlib',
-        'numpy',
-        'pandas',
+        # 'numpy',  # pandas依赖numpy，不能排除
+        # 'pandas',  # 项目实际使用pandas，不能排除
         'PIL',
         'cv2',
         'torch',
