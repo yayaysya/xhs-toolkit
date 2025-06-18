@@ -64,6 +64,17 @@ bash install.sh
 
 ### 从源码运行
 
+#### 使用 uv (推荐)
+
+```bash
+git clone https://github.com/aki66938/xiaohongshu-mcp-toolkit.git
+cd xiaohongshu-mcp-toolkit
+uv sync
+uv run python xhs_toolkit.py status
+```
+
+#### 使用 pip
+
 ```bash
 git clone https://github.com/aki66938/xiaohongshu-mcp-toolkit.git
 cd xiaohongshu-mcp-toolkit
