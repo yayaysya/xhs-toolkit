@@ -41,11 +41,11 @@
 
 ```bash
 # 下载并运行安装脚本
-curl -sSL https://raw.githubusercontent.com/aki66938/xiaohongshu-mcp-toolkit/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/aki66938/xhs-toolkit/main/install.sh | bash
 
 # 或者手动运行
-git clone https://github.com/aki66938/xiaohongshu-mcp-toolkit.git
-cd xiaohongshu-mcp-toolkit
+git clone https://github.com/aki66938/xhs-toolkit.git
+cd xhs-toolkit
 bash install.sh
 ```
 
@@ -67,8 +67,8 @@ bash install.sh
 #### 使用 uv (推荐)
 
 ```bash
-git clone https://github.com/aki66938/xiaohongshu-mcp-toolkit.git
-cd xiaohongshu-mcp-toolkit
+git clone https://github.com/aki66938/xhs-toolkit.git
+cd xhs-toolkit
 uv sync
 uv run python xhs_toolkit.py status
 ```
@@ -76,8 +76,8 @@ uv run python xhs_toolkit.py status
 #### 使用 pip
 
 ```bash
-git clone https://github.com/aki66938/xiaohongshu-mcp-toolkit.git
-cd xiaohongshu-mcp-toolkit
+git clone https://github.com/aki66938/xhs-toolkit.git
+cd xhs-toolkit
 pip install -r requirements.txt
 python xhs_toolkit.py status
 ```
