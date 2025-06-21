@@ -32,8 +32,42 @@
 
 ## 📋 环境要求
 
-- **浏览器**: Google Chrome 浏览器
-- **驱动**: ChromeDriver (`brew install chromedriver`)
+### 🌐 浏览器环境
+- **Google Chrome 浏览器** (最新版本推荐)
+- **ChromeDriver** (版本必须与Chrome版本完全匹配)
+
+### 🔍 查看Chrome版本
+在Chrome浏览器中访问：`chrome://version/`
+
+![chrome版本](src/static/check_chrome_version.png)
+
+### 📥 ChromeDriver安装方式
+
+#### 方法一：自动下载（推荐）
+```bash
+# 使用webdriver-manager自动管理
+pip install webdriver-manager
+```
+
+#### 方法二：手动下载
+1. 📋 访问官方下载页面：[Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/)
+2. 🎯 选择与您Chrome版本完全匹配的ChromeDriver
+3. 📁 下载后解压到合适位置（如 `/usr/local/bin/` 或 `C:\tools\`）
+4. ⚙️ 在 `.env` 文件中配置正确路径
+
+#### 方法三：包管理器安装
+```bash
+# macOS (Homebrew)
+brew install --cask chromedriver
+
+# Windows (Chocolatey)  
+choco install chromedriver
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install chromium-chromedriver
+```
+
+> ⚠️ **重要提示**：版本不匹配是最常见的问题原因，请确保ChromeDriver版本与Chrome浏览器版本完全一致！
 
 ## 🚀 快速开始
 
@@ -49,35 +83,36 @@ cd xhs-toolkit
 bash install.sh
 ```
 
-### 下载使用
 
-1. 从 [Releases页面](https://github.com/aki66938/xhs-toolkit/releases/latest) 下载适合你操作系统的版本
-2. 解压并运行：
-   ```bash
-   # macOS/Linux
-   chmod +x xhs-toolkit
-   ./xhs-toolkit status
-   
-   # Windows
-   xhs-toolkit.exe status
-   ```
 
-### 从源码运行
+### 🛠️ 从源码运行
 
-#### 使用 uv (推荐)
+#### 方法一：uv (推荐 ⚡)
 
 ```bash
+# 克隆项目
 git clone https://github.com/aki66938/xhs-toolkit.git
 cd xhs-toolkit
+
+# 使用uv安装依赖并运行
 uv sync
 uv run python xhs_toolkit.py status
 ```
 
-#### 使用 pip
+> 💡 **uv使用提示**：文档中所有 `python` 命令都可以用 `uv run python` 替代，享受更快的依赖管理体验！
+
+#### 方法二：pip (传统方式)
 
 ```bash
+# 克隆项目
 git clone https://github.com/aki66938/xhs-toolkit.git
 cd xhs-toolkit
+
+# 创建虚拟环境（推荐）
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 安装依赖
 pip install -r requirements.txt
 python xhs_toolkit.py status
 ```
@@ -102,28 +137,25 @@ CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 # ChromeDriver路径  
 WEBDRIVER_CHROME_DRIVER="/opt/homebrew/bin/chromedriver"
-
-# Cookies存储路径
-json_path="./xhs/cookies"
 ```
 
 ### 2. 获取登录凭证
 
 ```bash
-./xhs-toolkit cookie save
+python xhs_toolkit.py cookie save
 ```
 
 
 在弹出的浏览器中：
 1. 登录小红书创作者中心
 2. 确保能正常访问创作者中心功能
-3. 建议点击进入【发布笔记】页面，确认权限完整
-4. 完成后按回车键保存
+3. 完成后按回车键保存
 
 ### 3. 启动MCP服务器
 
 ```bash
-./xhs-toolkit server start
+
+python xhs_toolkit.py server start
 ```
 
 ### 4. 客户端配置
@@ -166,51 +198,57 @@ json_path="./xhs/cookies"
 
 | 工具名称 | 功能说明 | 参数 | 备注 |
 |---------|----------|------|------|
-| `test_connection` | 测试连接 | 无 | |
-| `start_publish_task` | 启动异步发布任务 ⚡ | title, content, tags, images, videos |  |
-| `check_task_status` | 检查任务状态 | task_id | 配合异步任务使用 |
-| `get_task_result` | 获取任务结果 | task_id | 获取最终发布结果 |
-| `close_browser` | 关闭浏览器 | 无 | 释放资源 |
-| `test_publish_params` | 测试发布参数 | title, content, tags, images, videos | 参数验证 |
-| `get_creator_data_analysis` | 获取创作者数据分析 | 无 | AI数据分析专用 |
-
-### 📱 异步发布模式 ⚡
-
-解决Cherry Studio等MCP客户端的超时问题：
-
-**使用方法**：
-1. **启动任务**：`start_publish_task("标题", "内容", videos="视频路径")`
-2. **检查进度**：`check_task_status("任务ID")`
-3. **获取结果**：`get_task_result("任务ID")`
+| `test_connection` | 测试MCP连接 | 无 | 连接状态检查 |
+| `smart_publish_note` | 发布小红书笔记 ⚡ | title, content, images, videos, tags, location | 支持智能路径解析 |
+| `check_task_status` | 检查发布任务状态 | task_id | 查看任务进度 |
+| `get_task_result` | 获取已完成任务的结果 | task_id | 获取最终发布结果 |
+| `login_xiaohongshu` | 智能登录小红书 | force_relogin, quick_mode | MCP专用无交互登录 |
+| `get_creator_data_analysis` | 获取创作者数据用于分析 | 无 | AI数据分析专用 |
 
 
-### 快速发布
 
-```bash
-# 图文发布
-python xhs_toolkit.py publish "今日分享" "内容文本" --tags "生活,美食" --images "/path/to/image1.jpg,/path/to/image2.jpg"
+### 💬 AI对话式操作指南
 
-# 视频发布 🆕
-python xhs_toolkit.py publish "视频分享" "视频内容描述" --tags "生活,vlog" --videos "/path/to/video.mp4"
+通过与AI对话即可完成登录、发布、数据分析等操作，无需学习复杂命令。
 
-# 命令行发布
-./xhs-toolkit publish "今日分享" "内容文本" --tags "生活,美食" --images "/path/to/image1.jpg"
-
-# 通过Claude发布（推荐）
-# 图文：请发布一篇小红书笔记，标题："今日分享"，内容："..."，图片路径："/User/me/xhs/poster.png"
-# 视频：请发布一篇小红书视频，标题："今日vlog"，内容："..."，视频路径："/User/me/xhs/video.mp4"
+#### 🔐 智能登录
+```
+用户："登录小红书"
 ```
 
-发布原理：
-手工上传过程中，浏览器会弹窗让用户选中文件路径
-告诉ai路径位置，ai会把路径参数对应丢给mcp的参数中，完成上传动作
+**重要提示**：
+- 🚨 首次使用请不要更改`headless`参数，获取到cookies后再更改为无头模式
+- 🌐 AI调用登录工具后会拉起浏览器，首次登录需要手动输入验证码或扫码
+- 🍪 成功后会自动保存cookies到本地，下次就免登录了
 
-**智能等待机制** ：
-- **图片上传**：快速上传，无需等待
-- **视频上传**：轮询检测上传进度，等待"上传成功"标识出现
-- **超时保护**：最长等待2分钟，避免MCP调用超时 
-- **状态监控**：DEBUG模式显示视频文件大小和时长信息
-- **高效轮询**：每2秒检查一次，精确文本匹配 
+#### 📝 内容发布
+
+**图文发布**：
+```
+请发布一篇小红书笔记，标题："今日分享"，内容："..."，图片路径："/User/me/xhs/poster.png"
+```
+
+**视频发布**：
+```
+请发布一篇小红书视频，标题："今日vlog"，内容："..."，视频路径："/User/me/xhs/video.mp4"
+```
+
+#### 📊 数据分析
+```
+请分析我的小红书账号数据，给出内容优化建议
+```
+
+#### 🔧 发布原理
+
+手工上传过程中，浏览器会弹窗让用户选中文件路径，AI会将用户提供的路径参数传递给MCP工具，自动完成上传动作。
+
+#### ⚡ 智能等待机制
+
+- **📷 图片上传**：快速上传，无需等待
+- **🎬 视频上传**：轮询检测上传进度，等待"上传成功"标识出现
+- **⏱️ 超时保护**：最长等待2分钟，避免MCP调用超时 
+- **📊 状态监控**：DEBUG模式显示视频文件大小和时长信息
+- **🔄 高效轮询**：每2秒检查一次，精确文本匹配 
 
 ### 📊 数据采集与AI分析功能 🆕(v1.2.0)
 
@@ -222,36 +260,6 @@ python xhs_toolkit.py publish "视频分享" "视频内容描述" --tags "生活
 - **数据驱动**: AI基于真实数据提供内容优化建议
 - **趋势分析**: 分析账号表现趋势和粉丝增长情况
 
-#### 环境变量配置
-
-在`.env`文件中添加数据采集相关配置：
-
-```bash
-# ==================== 数据存储配置 ====================
-# 是否启用PostgreSQL数据库存储（false=仅使用CSV存储，true=同时使用PostgreSQL）
-ENABLE_DATABASE=false
-
-# CSV数据存储路径（本地存储始终启用）
-DATA_STORAGE_PATH=data
-
-# ==================== 定时任务配置 ====================
-# 是否启用自动数据采集
-ENABLE_AUTO_COLLECTION=true
-
-# 程序启动时是否立即执行一次数据采集
-RUN_ON_STARTUP=true
-
-# 定时采集计划（cron表达式格式：分 时 日 月 星期）
-# 默认：每天凌晨1点执行数据采集
-COLLECTION_SCHEDULE=0 1 * * *
-
-# 采集任务配置
-COLLECT_DASHBOARD=true          # 是否采集仪表板数据
-COLLECT_CONTENT_ANALYSIS=true   # 是否采集内容分析数据  
-COLLECT_FANS=true               # 是否采集粉丝数据
-```
-
-
 
 #### 采集的数据类型
 
@@ -259,18 +267,10 @@ COLLECT_FANS=true               # 是否采集粉丝数据
 2. **内容分析数据**: 笔记表现数据，包括浏览量、点赞数、评论数等
 3. **粉丝数据**: 粉丝增长趋势、粉丝画像分析等
 
-#### 🤖 AI使用示例
-
-```bash
-# 通过Claude Desktop或其他chat客户端
-"请分析我的小红书账号数据，给出内容优化建议"
-
-# AI将自动调用 get_creator_data_analysis 工具
-# 获取中文表头的数据并进行智能分析
-```
 
 #### 定时任务示例
 
+采用cron语法，写入配置文件.env
 ```bash
 # 每6小时采集一次
 COLLECTION_SCHEDULE=0 */6 * * *
@@ -282,54 +282,136 @@ COLLECTION_SCHEDULE=0 9 * * 1-5
 COLLECTION_SCHEDULE=0 2 1 * *
 ```
 
-采用cron语法
+---
 
-### 版本演示截图(V1.2.0)
+## 🚀 更新日志 - v1.2.2
 
-![xhs_toolkit版本测试V1.2.0](src/static/cherrystudio_test_1.2.0.png)
+### 🆕 新增功能
+
+#### 🔐 智能登录系统
+- 新增自动化登录检测机制，支持MCP模式下的无交互登录
+- 实现四重检测机制：URL状态、页面元素、身份验证、错误状态检测
+- 添加智能等待机制，自动监测登录完成状态
+- 优化cookies保存逻辑，区分交互模式和自动化模式
+
+#### 🧠 智能路径解析系统
+- 新增智能文件路径识别功能，支持多种输入格式自动解析
+- 新增 `smart_parse_file_paths()` 函数，使用JSON解析、ast.literal_eval等多种解析方式
+- 适配LLM对话场景和dify等平台的数组数据传递
+
+**支持的输入格式**：
+- 逗号分隔：`"a.jpg,b.jpg,c.jpg"`
+- 数组字符串：`"[a.jpg,b.jpg,c.jpg]"`
+- JSON数组：`'["a.jpg","b.jpg","c.jpg"]'`
+- 真实数组：`["a.jpg", "b.jpg", "c.jpg"]`
+- 混合格式：`"[a.jpg,'b.jpg',\"c.jpg\"]"`
+
+#### 🛠️ 代码架构优化
+- 重构登录相关模块，提升代码可维护性
+- 优化异常处理机制，增强系统稳定性
+
+### 🔧 修复功能
+
+#### 📝 路径处理优化
+- 解决用户反馈的多张图片上传格式识别问题
+- 智能区分字符串和数组格式，避免数据类型判断错误
+- 支持从不同平台（dify、LLM对话等）传递的各种数据格式
+- 增强容错能力，即使格式不标准也能尽量解析
+
+---
+
+## 🚀 开发路线图
+
+### 📋 待开发功能
+
+#### 🔥 高优先级
+- **🌐 网络图片支持** - 图文发布将支持网络路径的图片，当前仅支持本地路径
+- **🏷️ 标签功能** - 目前tag标签暂未可用，tag是小红书内容发布增加流量的重要手段，必须支持
+
+#### 📈 中优先级
+- **🔐 登录体验优化** - 支持无头模式下在控制台展示二维码或手动输入验证码
+
+#### 🔮 规划中
+- **🤖 AI创作声明** - 如果内容是AI生成，AI创作声明配置功能
 
 
-## 🛠️ 常用命令
 
-```bash
-# 检查状态
-./xhs-toolkit status
+## 🔧 故障排除
 
-# Cookie管理
-./xhs-toolkit cookie save      # 获取cookies
-./xhs-toolkit cookie validate  # 验证cookies
+### ChromeDriver常见问题
 
-# 服务器管理
-./xhs-toolkit server start     # 启动服务器
-./xhs-toolkit server start --port 8080  # 自定义端口
-./xhs-toolkit server stop      # 停止服务器
-./xhs-toolkit server status    # 检查服务器状态
+#### ❌ 问题：版本不匹配错误
 ```
+selenium.common.exceptions.SessionNotCreatedException: session not created: This version of ChromeDriver only supports Chrome version XX
+```
+
+**✅ 解决方案**：
+1. 🔍 检查Chrome版本：访问 `chrome://version/`
+2. 📥 下载对应版本的ChromeDriver：[Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/)
+3. ⚙️ 更新 `.env` 文件中的路径配置
+
+#### ❌ 问题：ChromeDriver找不到
+```
+selenium.common.exceptions.WebDriverException: 'chromedriver' executable needs to be in PATH
+```
+
+**✅ 解决方案**：
+1. 确认ChromeDriver已下载并解压
+2. 方案A：将ChromeDriver添加到系统PATH
+3. 方案B：在 `.env` 中配置完整路径：`WEBDRIVER_CHROME_DRIVER="/path/to/chromedriver"`
+4. Linux/macOS: 确保文件有执行权限 `chmod +x chromedriver`
+
+#### ❌ 问题：Chrome浏览器路径错误
+```
+selenium.common.exceptions.WebDriverException: unknown error: cannot find Chrome binary
+```
+
+**✅ 解决方案**：在 `.env` 文件中配置正确的Chrome路径
+```bash
+# macOS
+CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+# Windows
+CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+# Linux
+CHROME_PATH="/usr/bin/google-chrome"
+```
+
+### 其他常见问题
+
+#### ❌ 问题：MCP连接失败
+**✅ 解决方案**：
+1. 确认服务器已启动：`python xhs_toolkit.py server start`
+2. 检查端口8000是否被占用
+3. 重启Claude Desktop或其他MCP客户端
+
+#### ❌ 问题：登录失败
+**✅ 解决方案**：
+1. 清除旧的cookies：删除 `xhs_cookies.json` 文件
+2. 重新获取cookies：`python xhs_toolkit.py cookie save`
+3. 确保使用正确的小红书创作者中心账号
+
+---
+
+## 🙏 鸣谢
+
+感谢以下贡献者为项目的发展做出的贡献：
+
+- **[@leebuooooo](https://github.com/leebuooooo)** (郭立ee) - 贡献了uv启动方式，提升了项目的依赖管理和运行体验
+
+如果您也想为项目做出贡献，欢迎提交 Pull Request 或 Issue！
+
+## 📄 许可证
+
+本项目基于 [MIT许可证](LICENSE) 开源。
+
 ## 🔐 安全承诺
 
 - ✅ **本地存储**: 所有数据仅保存在本地
 - ✅ **开源透明**: 代码完全开源，可审计
 - ✅ **用户控制**: 您完全控制自己的数据
 
-
-## Future
-
-**作者的一些话**
-
-搬家的事要放到7月了。。。。
-所以近期更新了新内容，关于创作者中心数据的采集并交付给AI进行分析
-
-后续更新打算以小版本迭代为主，目前功能开发比较粗糙，有很多可以优化待优化的操作逻辑需要调整，比如最影响的两点是cookies，让ai来自动打开网页让用户进行登录（一般情况），还有无头模式下如何实现用户输验证码等等，操作逻辑的优化能改善不少体验，因此短期内是暂时不会在架构和功能上进行大的改动了。
-
-再往后可能会考虑用playwright进行重构，以及www首页采集热点文章等等。热点文章采集也仅仅用于AI分析，供创作者学习，洗稿一类的操作，平台应该是禁止的，所以这方面的功能是不会开发的。
-
-文档将在微信公众号上更新，欢迎大家关注点击文档顶部的胶囊按钮扫码关注我的公众号，你的支持是我继续开发完善工具的动力！
-
-## 📄 许可证
-
-本项目基于 [MIT许可证](LICENSE) 开源。
-
----
 
 <div align="center">
 Made with ❤️ for content creators
