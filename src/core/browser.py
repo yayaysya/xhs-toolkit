@@ -62,6 +62,7 @@ class ChromeDriverManager:
             
             # 创建驱动
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
             self.is_initialized = True
             
             logger.info("✅ Chrome浏览器驱动初始化成功")
@@ -80,12 +81,16 @@ class ChromeDriverManager:
         # 基础选项
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
+        # chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--disable-software-rasterizer')
         chrome_options.add_argument('--disable-background-timer-throttling')
         chrome_options.add_argument('--disable-backgrounding-occluded-windows')
         chrome_options.add_argument('--disable-renderer-backgrounding')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
+        
+        # 禁用自动化扩展
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
         
         # 无头模式配置
         if self.config.headless:
@@ -122,6 +127,7 @@ class ChromeDriverManager:
         if self.config.debug_mode:
             chrome_options.add_argument('--enable-logging')
             chrome_options.add_argument('--log-level=0')
+            logger.debug("已启用Chrome调试日志")
         
         logger.debug("Chrome选项配置完成")
         return chrome_options
