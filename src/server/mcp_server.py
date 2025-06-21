@@ -12,6 +12,7 @@ import sys
 import socket
 import uuid
 import time
+from pathlib import Path
 from typing import Dict, Any
 from dataclasses import dataclass, asdict
 
@@ -23,6 +24,7 @@ from ..xiaohongshu.client import XHSClient
 from ..xiaohongshu.models import XHSNote
 from ..utils.logger import get_logger, setup_logger
 from ..data import storage_manager, data_scheduler
+from ..auth.smart_auth_server import SmartAuthServer, create_smart_auth_server
 
 logger = get_logger(__name__)
 
@@ -124,6 +126,7 @@ class MCPServer:
         self.mcp = FastMCP("小红书MCP服务器")
         self.task_manager = TaskManager()  # 添加任务管理器
         self.scheduler_initialized = False  # 调度器初始化标志
+        self.auth_server = create_smart_auth_server(config)  # 智能认证服务器
         self._setup_tools()
         self._setup_resources()
         self._setup_prompts()
@@ -131,7 +134,18 @@ class MCPServer:
     async def _initialize_data_collection(self) -> None:
         """初始化数据采集功能"""
         try:
+            import os
             logger.info("📊 初始化数据采集功能...")
+            
+            # 检查cookies是否存在，数据采集需要登录状态
+            cookies = self.xhs_client.cookie_manager.load_cookies()
+            if not cookies:
+                logger.warning("⚠️ 未找到cookies文件，跳过数据采集功能初始化")
+                logger.info("💡 数据采集需要登录状态，请先运行: python xhs_toolkit.py cookie save")
+                self.scheduler_initialized = False
+                return
+            
+            logger.info(f"✅ 检测到 {len(cookies)} 个cookies，可以进行数据采集")
             
             # 初始化存储管理器
             storage_manager.initialize()
@@ -166,7 +180,9 @@ class MCPServer:
             self.scheduler_initialized = True
             
         except Exception as e:
+            import traceback
             logger.error(f"❌ 数据采集功能初始化失败: {e}")
+            logger.error(f"❌ 错误详情: {traceback.format_exc()}")
             self.scheduler_initialized = False
     
     def _setup_tools(self) -> None:
@@ -183,6 +199,7 @@ class MCPServer:
             logger.info("🧪 收到连接测试请求")
             try:
                 import time
+                import os
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 
                 # 检查配置
@@ -213,34 +230,44 @@ class MCPServer:
                 return error_msg
         
         @self.mcp.tool()
-        async def start_publish_task(title: str, content: str, tags: str = "", 
-                                   location: str = "", images: str = "", videos: str = "") -> str:
+        async def smart_publish_note(title: str, content: str, images=None, videos=None, 
+                                   tags=None, location: str = "") -> str:
             """
-            启动异步发布任务（解决MCP超时问题）
+            发布小红书笔记（支持多种输入格式）
+            
+            这是主要的笔记发布工具，支持更灵活的参数输入，可以处理来自不同平台（如dify、LLM对话）的各种数据格式。
             
             Args:
-                title (str): 笔记标题，例如："今日分享"
-                content (str): 笔记内容，例如："今天去了一个很棒的地方"
-                tags (str, optional): 标签，用逗号分隔，例如："生活,旅行,美食"
-                location (str, optional): 位置信息，例如："北京"
-                images (str, optional): 图片文件路径，用逗号分隔
-                videos (str, optional): 视频文件路径，用逗号分隔
+                title (str): 笔记标题
+                content (str): 笔记内容  
+                images: 图片路径，支持格式：
+                       - 字符串："a.jpg,b.jpg,c.jpg"
+                       - 数组字符串："[a.jpg,b.jpg,c.jpg]"
+                       - JSON数组：'["a.jpg","b.jpg","c.jpg"]'
+                       - 真实数组：["a.jpg","b.jpg","c.jpg"]
+                videos: 视频路径，支持与images相同的格式（但只能有1个视频）
+                tags: 标签，支持字符串或数组格式
+                location (str, optional): 位置信息
             
             Returns:
                 str: 任务ID和状态信息
             """
-            logger.info(f"🚀 启动异步发布任务: 标题='{title}', 标签='{tags}', 位置='{location}', 图片='{images}', 视频='{videos}'")
+            logger.info(f"🚀 启动发布任务: 标题='{title}'")
+            logger.debug(f"📋 参数详情: images={images}, videos={videos}, tags={tags}")
             
             try:
-                # 创建笔记对象
-                note = XHSNote.from_strings(
+                # 使用智能创建方法
+                note = XHSNote.smart_create(
                     title=title,
                     content=content,
-                    tags_str=tags,
+                    tags=tags,
                     location=location,
-                    images_str=images,
-                    videos_str=videos
+                    images=images,
+                    videos=videos
                 )
+                
+                # 记录解析结果
+                logger.info(f"✅ 智能解析结果: 图片{len(note.images) if note.images else 0}张, 视频{len(note.videos) if note.videos else 0}个, 标签{len(note.tags) if note.tags else 0}个")
                 
                 # 创建异步任务
                 task_id = self.task_manager.create_task(note)
@@ -253,17 +280,27 @@ class MCPServer:
                     "success": True,
                     "task_id": task_id,
                     "message": f"发布任务已启动，任务ID: {task_id}",
-                    "next_step": f"请使用 check_task_status('{task_id}') 查看进度"
+                    "next_step": f"请使用 check_task_status('{task_id}') 查看进度",
+                    "parsing_result": {
+                        "images_parsed": note.images if note.images else [],
+                        "videos_parsed": note.videos if note.videos else [],
+                        "tags_parsed": note.tags if note.tags else [],
+                        "images_count": len(note.images) if note.images else 0,
+                        "videos_count": len(note.videos) if note.videos else 0,
+                        "tags_count": len(note.tags) if note.tags else 0,
+                        "content_type": "图文" if note.images else "视频" if note.videos else "纯文本"
+                    }
                 }
                 
                 return json.dumps(result, ensure_ascii=False, indent=2)
                 
             except Exception as e:
-                error_msg = f"启动发布任务失败: {str(e)}"
+                error_msg = f"发布任务启动失败: {str(e)}"
                 logger.error(f"❌ {error_msg}")
                 return json.dumps({
                     "success": False,
-                    "message": error_msg
+                    "message": error_msg,
+                    "suggestion": "请检查输入格式，确保图片/视频路径正确"
                 }, ensure_ascii=False, indent=2)
         
         @self.mcp.tool()
@@ -350,60 +387,69 @@ class MCPServer:
             return json.dumps(result, ensure_ascii=False, indent=2)
         
         @self.mcp.tool()
-        async def close_browser() -> str:
+        async def login_xiaohongshu(force_relogin: bool = False, quick_mode: bool = False) -> str:
             """
-            关闭浏览器
+            智能登录小红书
             
+            当用户说"登录小红书"时调用此工具。提供MCP专用的智能流程，无需用户交互确认。
+            
+            Args:
+                force_relogin: 是否强制重新登录，即使当前状态有效
+                quick_mode: 快速模式，降低验证要求以避免超时
+                
             Returns:
-                关闭状态信息
+                登录结果的JSON字符串
             """
-            logger.info("🔒 收到关闭浏览器请求")
+            logger.info(f"🚀 MCP工具调用：智能小红书 (force_relogin={force_relogin}, quick_mode={quick_mode})")
+            
             try:
-                self.xhs_client.browser_manager.close_driver()
-                logger.info("✅ 浏览器已关闭")
+                # 如果是快速模式，先检查是否已有cookies
+                if quick_mode:
+                    cookies_file = Path(self.config.cookies_file)
+                    if cookies_file.exists():
+                        logger.info("⚡ 快速模式：发现已有cookies，跳过登录")
+                        return json.dumps({
+                            "success": True,
+                            "message": "✅ 快速模式：检测到已有cookies，跳过登录流程",
+                            "action": "quick_skip",
+                            "status": "valid",
+                            "mode": "mcp_quick"
+                        }, ensure_ascii=False, indent=2)
+                
+                # 使用MCP专用的智能模式
+                result = await self.auth_server.smart_login(interactive=False, mcp_mode=True)
+                
+                # 格式化返回消息
+                if result.get("success", False):
+                    action = result.get("action", "unknown")
+                    if action == "mcp_auto_login":
+                        message = f"✅ {result['message']}\n🤖 MCP智能登录已完成，cookies已保存"
+                    elif action == "skipped":
+                        message = f"✅ {result['message']}\n💡 当前登录状态有效"
+                    else:
+                        message = f"✅ {result['message']}"
+                else:
+                    message = f"❌ {result['message']}\n🔧 请检查浏览器或网络连接"
+                
+                logger.info(f"✅ MCP自动登录结果: {result.get('action', 'unknown')}")
                 return json.dumps({
-                    "success": True,
-                    "message": "浏览器已成功关闭"
+                    "success": result.get("success", False),
+                    "message": message,
+                    "action": result.get("action", "unknown"),
+                    "status": result.get("status", "unknown"),
+                    "mode": "mcp_auto"
                 }, ensure_ascii=False, indent=2)
+                
             except Exception as e:
-                error_msg = f"关闭浏览器失败: {str(e)}"
+                error_msg = f"MCP自动登录执行失败: {str(e)}"
                 logger.error(f"❌ {error_msg}")
                 return json.dumps({
                     "success": False,
-                    "message": error_msg
+                    "message": f"❌ {error_msg}",
+                    "error": str(e),
+                    "mode": "mcp_auto",
+                    "suggestion": "可以尝试快速模式：login_xiaohongshu(quick_mode=True)"
                 }, ensure_ascii=False, indent=2)
-        
-        @self.mcp.tool()
-        async def test_publish_params(title: str, content: str, image_path: str = "") -> str:
-            """
-            测试发布参数解析（不实际发布）
-            
-            Args:
-                title (str): 测试标题
-                content (str): 测试内容
-                image_path (str, optional): 测试图片路径
-            
-            Returns:
-                str: 参数解析结果
-            """
-            logger.info(f"🧪 测试参数解析: title='{title}', content='{content}', image_path='{image_path}'")
-            
-            result = {
-                "test_mode": True,
-                "received_params": {
-                    "title": title,
-                    "content": content,
-                    "image_path": image_path,
-                    "title_length": len(title),
-                    "content_length": len(content),
-                    "image_path_valid": bool(image_path and image_path.startswith("/"))
-                },
-                "message": "参数接收成功，这是测试模式，未实际发布",
-                "timestamp": str(asyncio.get_event_loop().time())
-            }
-            
-            logger.info(f"✅ 测试完成: {result}")
-            return json.dumps(result, ensure_ascii=False, indent=2)
         
         @self.mcp.tool()
         async def get_creator_data_analysis() -> str:
@@ -416,10 +462,20 @@ class MCPServer:
             logger.info("📊 获取创作者数据用于分析")
             
             try:
+                # 检查cookies是否存在，数据分析需要登录状态
+                cookies = self.xhs_client.cookie_manager.load_cookies()
+                if not cookies:
+                    return json.dumps({
+                        "success": False,
+                        "message": "数据分析需要登录状态，未找到cookies文件",
+                        "suggestion": "请先运行: python xhs_toolkit.py cookie save"
+                    }, ensure_ascii=False, indent=2)
+                
                 if not self.scheduler_initialized:
                     return json.dumps({
                         "success": False,
-                        "message": "数据采集功能未初始化"
+                        "message": "数据采集功能未初始化，可能因为cookies问题",
+                        "suggestion": "请检查cookies状态并重启服务器"
                     }, ensure_ascii=False, indent=2)
                 
                 # 获取存储管理器
@@ -476,9 +532,48 @@ class MCPServer:
             return
         
         try:
-            # 阶段1：初始化浏览器
-            self.task_manager.update_task(task_id, status="initializing", progress=10, message="正在初始化浏览器...")
+            # 阶段0：快速验证登录状态（仅检查cookies存在性）
+            self.task_manager.update_task(task_id, status="validating", progress=5, message="正在快速验证登录状态...")
             
+            try:
+                # 只检查cookies文件是否存在，避免重复的详细验证
+                cookies_file = Path(self.config.cookies_file)
+                if not cookies_file.exists():
+                    self.task_manager.update_task(
+                        task_id, 
+                        status="failed", 
+                        progress=0, 
+                        message="❌ 未找到登录cookies，请先登录小红书",
+                        result={
+                            "success": False,
+                            "error_type": "auth_required",
+                            "user_action_required": "需要登录小红书",
+                            "suggested_command": "请对AI说：'登录小红书'"
+                        }
+                    )
+                    logger.warning(f"⚠️ 任务 {task_id} 因缺少cookies而停止")
+                    return
+                
+                # 快速验证通过，继续发布流程
+                self.task_manager.update_task(task_id, status="initializing", progress=10, message="✅ 登录状态验证通过，正在初始化浏览器...")
+                
+            except Exception as e:
+                logger.error(f"❌ 登录状态验证出错: {e}")
+                self.task_manager.update_task(
+                    task_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=f"❌ 登录状态验证出错: {str(e)}",
+                    result={
+                        "success": False,
+                        "error_type": "validation_error",
+                        "error": str(e),
+                        "suggested_action": "请重新登录小红书后重试"
+                    }
+                )
+                return
+            
+            # 阶段1：初始化浏览器
             # 创建新的客户端实例，避免并发冲突
             client = XHSClient(self.config)
             
@@ -694,14 +789,6 @@ class MCPServer:
         
         logger.info("✅ 配置验证通过")
         
-        # 检查cookies
-        cookies = self.xhs_client.cookie_manager.load_cookies()
-        if not cookies:
-            logger.warning("⚠️ 未找到cookies文件，请先运行获取cookies")
-            logger.info("💡 运行命令: python xhs_toolkit.py cookie save")
-        else:
-            logger.info(f"✅ 已加载 {len(cookies)} 个cookies")
-        
         # 设置信号处理
         self._setup_signal_handlers()
         
@@ -722,18 +809,18 @@ class MCPServer:
             logger.info(f"   • http://{local_ip}:{self.config.server_port}/sse (内网)")
         
         logger.info("🎯 MCP工具列表:")
-        logger.info("   • test_connection - 测试连接")
-        logger.info("   • start_publish_task - 启动异步发布任务")
-        logger.info("   • check_task_status - 检查任务状态")
-        logger.info("   • get_task_result - 获取任务结果")
-        logger.info("   • close_browser - 关闭浏览器")
-        logger.info("   • test_publish_params - 测试参数")
-        logger.info("   • get_creator_data_analysis - 获取创作者数据分析")
+        logger.info("   • test_connection - 测试MCP连接")
+        logger.info("   • smart_publish_note - 发布小红书笔记（支持智能路径解析）")
+        logger.info("   • check_task_status - 检查发布任务状态")
+        logger.info("   • get_task_result - 获取已完成任务的结果")
+        logger.info("   • login_xiaohongshu - 智能登录小红书")
+        logger.info("   • get_creator_data_analysis - 获取创作者数据用于分析")
         
         logger.info("🔧 按 Ctrl+C 停止服务器")
         logger.info("💡 终止时的ASGI错误信息是正常现象，可以忽略")
         
         # 初始化数据采集功能
+        logger.info("📊 初始化数据采集功能...")
         try:
             asyncio.run(self._initialize_data_collection())
         except Exception as e:
