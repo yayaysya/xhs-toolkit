@@ -6,7 +6,12 @@
 
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, field_validator
-from ..utils.text_utils import validate_note_content, parse_tags_string, parse_file_paths_string
+
+# 尝试相对导入，失败则使用绝对导入
+try:
+    from ..utils.text_utils import validate_note_content, parse_tags_string, parse_file_paths_string, smart_parse_file_paths
+except ImportError:
+    from src.utils.text_utils import validate_note_content, parse_tags_string, parse_file_paths_string, smart_parse_file_paths
 
 
 class XHSNote(BaseModel):
@@ -135,15 +140,58 @@ class XHSNote(BaseModel):
             content: 笔记内容
             tags_str: 标签字符串（逗号分隔）
             location: 位置信息
-            images_str: 图片路径字符串（逗号分隔）
-            videos_str: 视频路径字符串（逗号分隔）
+            images_str: 图片路径字符串（支持多种格式：逗号分隔、数组字符串、JSON数组等）
+            videos_str: 视频路径字符串（支持多种格式：逗号分隔、数组字符串、JSON数组等）
             
         Returns:
             XHSNote实例
         """
         tag_list = parse_tags_string(tags_str) if tags_str else None
-        image_list = parse_file_paths_string(images_str) if images_str else None
-        video_list = parse_file_paths_string(videos_str) if videos_str else None
+        image_list = smart_parse_file_paths(images_str) if images_str else None
+        video_list = smart_parse_file_paths(videos_str) if videos_str else None
+        
+        return cls(
+            title=title,
+            content=content,
+            images=image_list,
+            videos=video_list,
+            tags=tag_list,
+            location=location if location else None
+        )
+
+    @classmethod  
+    def smart_create(cls, title: str, content: str, tags=None, 
+                    location: str = "", images=None, videos=None) -> 'XHSNote':
+        """
+        智能创建笔记对象，支持多种输入格式
+        
+        Args:
+            title: 笔记标题
+            content: 笔记内容
+            tags: 标签（支持字符串、列表等多种格式）
+            location: 位置信息
+            images: 图片路径（支持字符串、列表、JSON等多种格式）
+            videos: 视频路径（支持字符串、列表、JSON等多种格式）
+            
+        Returns:
+            XHSNote实例
+        """
+        # 智能解析标签
+        if tags:
+            if isinstance(tags, str):
+                tag_list = parse_tags_string(tags)
+            elif isinstance(tags, (list, tuple)):
+                tag_list = [str(tag).strip() for tag in tags if str(tag).strip()]
+            else:
+                tag_list = parse_tags_string(str(tags))
+        else:
+            tag_list = None
+        
+        # 智能解析图片路径
+        image_list = smart_parse_file_paths(images) if images else None
+        
+        # 智能解析视频路径  
+        video_list = smart_parse_file_paths(videos) if videos else None
         
         return cls(
             title=title,
