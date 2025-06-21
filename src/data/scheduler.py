@@ -157,7 +157,6 @@ class DataCollectionScheduler:
             # 如果导入失败，尝试另一种导入方式
             try:
                 import sys
-                import os
                 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
                 from xiaohongshu.data_collector.dashboard import collect_dashboard_data
                 from xiaohongshu.data_collector.content_analysis import collect_content_analysis_data
