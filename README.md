@@ -1,7 +1,7 @@
 # 📕 小红书MCP工具包
 
 [![许可证](https://img.shields.io/github/license/aki66938/xhs-toolkit)](LICENSE)
-[![微信公众号](https://img.shields.io/badge/凯隐的无人化生产矩阵-公众号-bule?style=flat-square&logo=wechat)](src/static/qrcode_for_gh_19088e185f66_258.jpg)
+[![微信公众号](https://img.shields.io/badge/凯隐的无人化生产矩阵-公众号-bule?style=flat-square&logo=wechat)]((https://kayin-1253854796.cos.ap-shanghai.myqcloud.com/ownmedia/20250622023225261.jpg?imageSlim))
 
 一个强大的小红书自动化工具包，支持通过MCP协议与AI客户端（如Claude Desktop等）集成，实现与AI对话即可进行内容创作、发布及创作者数据分析。
 
@@ -42,7 +42,8 @@
 ### 🔍 查看Chrome版本
 在Chrome浏览器中访问：`chrome://version/`
 
-![chrome版本](src/static/check_chrome_version.png)
+<!-- ![chrome版本](src/static/check_chrome_version.png) -->
+![chrome版本](https://kayin-1253854796.cos.ap-shanghai.myqcloud.com/ownmedia/20250622022832077.png?imageSlim)
 
 ### 📥 ChromeDriver安装方式
 
@@ -185,15 +186,13 @@ python xhs_toolkit.py server start
 
 在MCP配置中添加
 
-![Cherry Studio配置](src/static/cherrystudio.png)
-
+![Cherry Studio配置](https://kayin-1253854796.cos.ap-shanghai.myqcloud.com/ownmedia/20250622022940845.png?imageSlim)
 
 **n8n**
 
 在n8n的AI agent节点的tool中添加配置配置
 
-![n8n的AI agent配置](src/static/n8n_mcp.png)
-
+![n8n的AI agent配置](https://kayin-1253854796.cos.ap-shanghai.myqcloud.com/ownmedia/20250622023033506.png?imageSlim)
 
 ## 🔧 主要功能
 
