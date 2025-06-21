@@ -401,7 +401,7 @@ CHROME_PATH="/usr/bin/google-chrome"
 
 感谢以下贡献者为项目的发展做出的贡献：
 
-- **[@leebuooooo](https://github.com/leebuooooo)** (郭立ee) - 贡献了uv启动方式，提升了项目的依赖管理和运行体验
+- **[@leebuooooo](https://github.com/leebuooooo)** (郭立ee)
 
 如果您也想为项目做出贡献，欢迎提交 Pull Request 或 Issue！
 
