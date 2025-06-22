@@ -286,6 +286,25 @@ COLLECTION_SCHEDULE=0 2 1 * *
 
 ---
 
+## 🚀 更新日志 - v1.2.3
+
+### 🔧 重要修复
+
+#### 🖥️ 无头模式优化
+- **修复无头模式失效问题**：增强Chrome无头模式配置，添加多重保险参数
+- **优化浏览器启动逻辑**：使用`--headless=new`和`--headless`双重无头模式配置
+- **优化配置验证**：确保所有模块都使用统一的HEADLESS配置，避免配置不一致问题
+
+### 💡 细节
+- 添加了`--disable-gpu-compositing`、`--disable-notifications`等多个Chrome参数
+- 改进了MCP服务器启动时的异步初始化逻辑
+- 增强了Windows环境下的兼容性和稳定性
+
+---
+
+<details>
+<summary>📜 点击查看 v1.2.2 更新日志</summary>
+
 ## 🚀 更新日志 - v1.2.2
 
 ### 🆕 新增功能
@@ -320,7 +339,10 @@ COLLECTION_SCHEDULE=0 2 1 * *
 - 支持从不同平台（dify、LLM对话等）传递的各种数据格式
 - 增强容错能力，即使格式不标准也能尽量解析
 
+</details>
+
 ---
+
 
 ## 🚀 开发路线图
 
