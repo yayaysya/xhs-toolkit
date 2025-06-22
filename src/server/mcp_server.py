@@ -133,6 +133,9 @@ class MCPServer:
     
     async def _initialize_data_collection(self) -> None:
         """初始化数据采集功能"""
+        if self.scheduler_initialized:
+            return  # 已经初始化过了
+            
         try:
             import os
             logger.info("📊 初始化数据采集功能...")
@@ -819,10 +822,14 @@ class MCPServer:
         logger.info("🔧 按 Ctrl+C 停止服务器")
         logger.info("💡 终止时的ASGI错误信息是正常现象，可以忽略")
         
-        # 初始化数据采集功能
-        logger.info("📊 初始化数据采集功能...")
+        # 初始化数据采集功能（无头模式）
+        logger.info("📊 初始化数据采集功能（无头模式）...")
         try:
             asyncio.run(self._initialize_data_collection())
+            if self.scheduler_initialized:
+                logger.info("✅ 数据采集功能初始化完成（无头模式）")
+            else:
+                logger.info("ℹ️ 数据采集功能未启用或初始化失败")
         except Exception as e:
             logger.warning(f"⚠️ 数据采集功能初始化失败: {e}")
         

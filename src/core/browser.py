@@ -94,8 +94,34 @@ class ChromeDriverManager:
         
         # 无头模式配置
         if self.config.headless:
-            chrome_options.add_argument('--headless')
-            logger.info("🔒 启用无头浏览器模式")
+            # 强制无头模式 - 双重保险
+            chrome_options.add_argument('--headless=new')  # 新版Chrome支持
+            chrome_options.add_argument('--headless')      # 传统支持
+            
+            # Windows环境GPU禁用（必需）
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-gpu-compositing')
+            
+            # 强制无界面运行
+            chrome_options.add_argument('--no-first-run')
+            chrome_options.add_argument('--disable-default-apps')
+            chrome_options.add_argument('--disable-infobars')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-popup-blocking')
+            
+            # 隐藏UI元素
+            chrome_options.add_argument('--hide-scrollbars')
+            chrome_options.add_argument('--mute-audio')
+            chrome_options.add_argument('--disable-notifications')
+            chrome_options.add_argument('--disable-features=TranslateUI')
+            
+            # 添加调试端口（有助于无头模式稳定性）
+            chrome_options.add_argument('--remote-debugging-port=9222')
+            
+            # 窗口设置（即使无头模式也设置）
+            chrome_options.add_argument('--start-maximized')
+            
+            logger.info("🔒 启用强制无头浏览器模式（双重保险）")
         else:
             logger.info("🖥️ 启用有界面浏览器模式")
         
