@@ -418,11 +418,13 @@ CHROME_PATH="/usr/bin/google-chrome"
 
 ---
 
-## 🙏 鸣谢
+## 🙏 贡献者
 
-感谢以下贡献者为项目的发展做出的贡献：
+感谢所有为项目做出贡献的人！
 
-- **[@leebuooooo](https://github.com/leebuooooo)** (郭立ee)
+<a href="https://github.com/aki66938/xhs-toolkit/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=aki66938/xhs-toolkit" />
+</a>
 
 如果您也想为项目做出贡献，欢迎提交 Pull Request 或 Issue！
 
