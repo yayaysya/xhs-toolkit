@@ -391,7 +391,19 @@ class XHSClient:
                 raise PublishError("无法找到内容输入框", publish_step="查找内容输入框")
             
             content_input.clear()
-            content_input.send_keys(clean_text_for_browser(note.content))
+            
+            # 处理内容，支持换行
+            from selenium.webdriver.common.keys import Keys
+            cleaned_content = clean_text_for_browser(note.content)
+            
+            # 分段输入，正确处理换行
+            lines = cleaned_content.split('\n')
+            for i, line in enumerate(lines):
+                content_input.send_keys(line)
+                if i < len(lines) - 1:
+                    content_input.send_keys(Keys.ENTER)
+                await asyncio.sleep(0.1)  # 短暂等待
+            
             logger.info("✅ 内容已填写")
             
         except Exception as e:
