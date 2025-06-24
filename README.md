@@ -293,7 +293,7 @@ python xhs_toolkit.py server start
 - **📊 状态监控**：DEBUG模式显示视频文件大小和时长信息
 - **🔄 高效轮询**：每2秒检查一次，精确文本匹配 
 
-### 📊 数据采集与AI分析功能 🆕(v1.2.0)
+### 📊 数据采集与AI分析功能
 
 自动采集小红书创作者数据，支持定时任务和AI智能分析。
 
@@ -324,9 +324,46 @@ COLLECTION_SCHEDULE=0 9 * * 1-5
 # 每月1号凌晨2点采集
 COLLECTION_SCHEDULE=0 2 1 * *
 ```
+---
+## 🚀 更新日志 - v1.2.4
+
+### 新增功能
+
+#### 🌐 网络图片支持
+- 支持 HTTP/HTTPS 图片链接直接发布
+- 自动下载网络图片到本地临时目录
+- 支持常见图片格式（jpg、png、gif、webp）
+
+#### 📁 改进的图片处理
+- 新增 `ImageProcessor` 模块统一处理各种图片输入
+- 支持混合输入：`["local.jpg", "https://example.com/img.jpg"]`
+- 更灵活的输入格式支持
+
+### 使用示例
+
+```python
+# 网络图片
+smart_publish_note(
+    title="美食分享",
+    content="今天的美食",
+    images=["https://example.com/food.jpg"]
+)
+
+# 混合使用
+smart_publish_note(
+    title="旅行记录",
+    content="风景很美",
+    images=["/local/photo.jpg", "https://example.com/view.jpg"]
+)
+```
+
+### 其他优化
+- 改进文本处理，保留换行符
+- 更新文档说明
 
 ---
-
+<details>
+<summary>📜 点击查看 v1.2.3 更新日志</summary>
 ## 🚀 更新日志 - v1.2.3
 
 ### 🔧 重要修复
@@ -340,7 +377,7 @@ COLLECTION_SCHEDULE=0 2 1 * *
 - 添加了`--disable-gpu-compositing`、`--disable-notifications`等多个Chrome参数
 - 改进了MCP服务器启动时的异步初始化逻辑
 - 增强了Windows环境下的兼容性和稳定性
-
+</details>
 ---
 
 <details>
