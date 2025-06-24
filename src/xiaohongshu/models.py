@@ -201,6 +201,56 @@ class XHSNote(BaseModel):
             tags=tag_list,
             location=location if location else None
         )
+    
+    @classmethod
+    async def async_smart_create(cls, title: str, content: str, tags=None,
+                                location: str = "", images=None, videos=None) -> 'XHSNote':
+        """
+        异步智能创建笔记对象，支持多种输入格式（包括URL）
+        
+        Args:
+            title: 笔记标题
+            content: 笔记内容
+            tags: 标签（支持字符串、列表等多种格式）
+            location: 位置信息
+            images: 图片，支持格式：
+                   - 本地路径："image.jpg" 或 ["/path/to/image.jpg"]
+                   - 网络地址："https://example.com/image.jpg"
+                   - 混合数组：["local.jpg", "https://example.com/img.jpg"]
+            videos: 视频路径（目前仅支持本地文件）
+            
+        Returns:
+            XHSNote实例
+        """
+        # 智能解析标签
+        if tags:
+            if isinstance(tags, str):
+                tag_list = parse_tags_string(tags)
+            elif isinstance(tags, (list, tuple)):
+                tag_list = [str(tag).strip() for tag in tags if str(tag).strip()]
+            else:
+                tag_list = parse_tags_string(str(tags))
+        else:
+            tag_list = None
+        
+        # 处理图片（支持URL）
+        processed_images = None
+        if images:
+            from ..utils.image_processor import ImageProcessor
+            processor = ImageProcessor()
+            processed_images = await processor.process_images(images)
+        
+        # 智能解析视频路径（暂时只支持本地文件）
+        video_list = smart_parse_file_paths(videos) if videos else None
+        
+        return cls(
+            title=title,
+            content=content,
+            images=processed_images,
+            videos=video_list,
+            tags=tag_list,
+            location=location if location else None
+        )
 
 
 class XHSSearchResult(BaseModel):

@@ -238,29 +238,38 @@ class MCPServer:
             """
             发布小红书笔记（支持多种输入格式）
             
-            这是主要的笔记发布工具，支持更灵活的参数输入，可以处理来自不同平台（如dify、LLM对话）的各种数据格式。
+            这是主要的笔记发布工具，支持更灵活的参数输入，可以处理来自不同平台的各种数据格式。
             
             Args:
                 title (str): 笔记标题
                 content (str): 笔记内容  
-                images: 图片路径，支持格式：
-                       - 字符串："a.jpg,b.jpg,c.jpg"
-                       - 数组字符串："[a.jpg,b.jpg,c.jpg]"
-                       - JSON数组：'["a.jpg","b.jpg","c.jpg"]'
-                       - 真实数组：["a.jpg","b.jpg","c.jpg"]
-                videos: 视频路径，支持与images相同的格式（但只能有1个视频）
+                images: 图片，支持格式：
+                       - 本地路径："image.jpg" 或 ["/path/to/image.jpg"]
+                       - 网络地址："https://example.com/image.jpg"
+                       - 混合数组：["local.jpg", "https://example.com/img.jpg"]
+                       - 逗号分隔字符串："a.jpg,b.jpg,c.jpg"
+                videos: 视频路径（目前仅支持本地文件）
                 tags: 标签，支持字符串或数组格式
                 location (str, optional): 位置信息
             
             Returns:
                 str: 任务ID和状态信息
+                
+            示例:
+                # 使用网络图片
+                smart_publish_note(
+                    title="美食分享",
+                    content="今天的美食",
+                    images=["https://example.com/food.jpg"]
+                )
+                
             """
             logger.info(f"🚀 启动发布任务: 标题='{title}'")
             logger.debug(f"📋 参数详情: images={images}, videos={videos}, tags={tags}")
             
             try:
-                # 使用智能创建方法
-                note = XHSNote.smart_create(
+                # 使用异步智能创建方法
+                note = await XHSNote.async_smart_create(
                     title=title,
                     content=content,
                     tags=tags,
@@ -303,7 +312,7 @@ class MCPServer:
                 return json.dumps({
                     "success": False,
                     "message": error_msg,
-                    "suggestion": "请检查输入格式，确保图片/视频路径正确"
+                    "suggestion": "请检查输入格式，确保图片/视频路径正确或网络连接正常"
                 }, ensure_ascii=False, indent=2)
         
         @self.mcp.tool()
@@ -521,6 +530,7 @@ class MCPServer:
                     "success": False,
                     "message": error_msg
                 }, ensure_ascii=False, indent=2)
+        
     
     async def _execute_publish_task(self, task_id: str) -> None:
         """
@@ -772,6 +782,57 @@ class MCPServer:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
     
+    def start_stdio(self) -> None:
+        """启动stdio模式的MCP服务器（用于Claude Desktop）"""
+        # 设置日志只输出到stderr，避免干扰stdio通信
+        import sys
+        from ..utils.logger import setup_logger, get_logger
+        
+        # 重新配置日志，只输出到stderr
+        import logging
+        root_logger = logging.getLogger()
+        root_logger.handlers = []
+        
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)-8s | %(message)s'))
+        root_logger.addHandler(stderr_handler)
+        root_logger.setLevel(getattr(logging, self.config.log_level.upper()))
+        
+        logger.info("🚀 启动MCP服务器（stdio模式）...")
+        
+        # 验证配置
+        validation = self.config.validate_config()
+        if not validation["valid"]:
+            logger.error("❌ 配置验证失败:")
+            for issue in validation["issues"]:
+                logger.error(f"   • {issue}")
+            return
+        
+        logger.info("✅ 配置验证通过")
+        
+        # 工具已在__init__中注册
+        logger.info(f"🎯 MCP工具列表:")
+        for tool in ["test_connection", "smart_publish_note", "check_task_status", 
+                    "get_task_result", "login_xiaohongshu", "get_creator_data_analysis"]:
+            logger.info(f"   • {tool}")
+        
+        # 初始化数据采集（如果启用）
+        try:
+            cookies = self.xhs_client.cookie_manager.load_cookies()
+            if cookies and os.getenv('ENABLE_AUTO_COLLECTION', 'false').lower() == 'true':
+                logger.info("📊 初始化数据采集功能...")
+                # stdio模式下使用无头浏览器
+                self.xhs_client.browser_manager.headless = True
+                self.scheduler_initialized = self._initialize_data_collection()
+            else:
+                logger.info("ℹ️ 数据采集功能未启用")
+        except Exception as e:
+            logger.warning(f"⚠️ 数据采集功能初始化失败: {e}")
+        
+        # 使用stdio transport
+        logger.info("🎯 MCP工具已注册，等待客户端连接...")
+        self.mcp.run(transport="stdio")
+    
     def start(self) -> None:
         """启动MCP服务器"""
         logger.info("🚀 启动小红书 MCP 服务器...")
@@ -834,7 +895,11 @@ class MCPServer:
             logger.warning(f"⚠️ 数据采集功能初始化失败: {e}")
         
         try:
-            # 使用FastMCP内置的run方法
+            # 使用FastMCP内置的run方法，禁用uvicorn的日志以避免干扰MCP通信
+            import logging
+            logging.getLogger("uvicorn").setLevel(logging.WARNING)
+            logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+            
             self.mcp.run(transport="sse", port=self.config.server_port, host=self.config.server_host)
             
         except KeyboardInterrupt:
@@ -876,11 +941,19 @@ def create_mcp_server(config: XHSConfig) -> MCPServer:
 
 def main():
     """主函数入口"""
+    import sys
     from ..core.config import XHSConfig
     
     config = XHSConfig()
     server = MCPServer(config)
-    server.start()
+    
+    # 检查是否通过stdio启动（Claude Desktop使用）
+    if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
+        # 使用stdio模式
+        server.start_stdio()
+    else:
+        # 默认使用SSE模式（用于其他客户端）
+        server.start()
 
 
 if __name__ == "__main__":

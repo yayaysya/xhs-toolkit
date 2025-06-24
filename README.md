@@ -8,8 +8,9 @@
 ## ✨ 主要特性
 
 - 🍪 **Cookie管理**: 安全获取、验证和管理小红书登录凭证
-- 🤖 **MCP协议支持**: 与CherryStudio等AI客户端无缝集成
+- 🤖 **MCP协议支持**: 与Claude Desktop、CherryStudio等AI客户端无缝集成
 - 📝 **自动发布**: 支持图文和视频笔记的自动化发布
+- 🖼️ **多样化图片支持**: 支持本地图片、网络URL
 - ⏰ **定时任务**: 支持cron表达式的定时数据采集
 - 📊 **数据采集**: 自动采集创作者中心仪表板、内容分析、粉丝数据
 - 🧠 **AI数据分析**: 中文表头数据，AI可直接理解和分析
@@ -165,22 +166,55 @@ python xhs_toolkit.py server start
 ### 4. 客户端配置
 **Claude Desktop**
 
-在 `~/.claude_desktop_config.json` 中添加：
+#### 使用 uv（推荐）
+在 `~/Library/Application Support/Claude/claude_desktop_config.json` 中添加：
 
 ```json
 {
   "mcpServers": {
-    "xiaohongshu": {
-      "command": "curl",
+    "xhs-toolkit": {
+      "command": "uv",
       "args": [
-        "-N",
-        "-H", "Accept: text/event-stream",
-        "http://localhost:8000/sse"
+        "--directory",
+        "/path/to/xhs-toolkit",
+        "run",
+        "python",
+        "-m",
+        "src.server.mcp_server",
+        "--stdio"
       ]
     }
   }
 }
 ```
+
+#### 使用系统 Python
+如果不使用 uv，可以配置为：
+
+```json
+{
+  "mcpServers": {
+    "xhs-toolkit": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "src.server.mcp_server",
+        "--stdio"
+      ],
+      "cwd": "/path/to/xhs-toolkit",
+      "env": {
+        "PYTHONPATH": "/path/to/xhs-toolkit"
+      }
+    }
+  }
+}
+```
+
+**注意**：
+- 需要将 `/path/to/xhs-toolkit` 替换为实际的项目路径
+- macOS 用户配置文件位置：`~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows 用户配置文件位置：`%APPDATA%\Claude\claude_desktop_config.json`
+- 修改配置后需要重启 Claude Desktop
 
 **cherry studio**
 
@@ -201,7 +235,7 @@ python xhs_toolkit.py server start
 | 工具名称 | 功能说明 | 参数 | 备注 |
 |---------|----------|------|------|
 | `test_connection` | 测试MCP连接 | 无 | 连接状态检查 |
-| `smart_publish_note` | 发布小红书笔记 ⚡ | title, content, images, videos, tags, location | 支持智能路径解析 |
+| `smart_publish_note` | 发布小红书笔记 ⚡ | title, content, images, videos, tags, location | 支持本地路径、网络URL |
 | `check_task_status` | 检查发布任务状态 | task_id | 查看任务进度 |
 | `get_task_result` | 获取已完成任务的结果 | task_id | 获取最终发布结果 |
 | `login_xiaohongshu` | 智能登录小红书 | force_relogin, quick_mode | MCP专用无交互登录 |
@@ -225,15 +259,22 @@ python xhs_toolkit.py server start
 
 #### 📝 内容发布
 
-**图文发布**：
+**图文发布（本地图片）**：
 ```
 请发布一篇小红书笔记，标题："今日分享"，内容："..."，图片路径："/User/me/xhs/poster.png"
 ```
+
+**图文发布（网络图片）**：
+```
+请发布一篇小红书笔记，标题："美食分享"，内容："今天的美食"，使用这个网络图片：https://example.com/food.jpg
+```
+
 
 **视频发布**：
 ```
 请发布一篇小红书视频，标题："今日vlog"，内容："..."，视频路径："/User/me/xhs/video.mp4"
 ```
+
 
 #### 📊 数据分析
 ```

@@ -33,8 +33,9 @@ def clean_text_for_browser(text: str) -> str:
             # 用空格替换不支持的字符
             cleaned_text += " "
     
-    # 清理连续的空格
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+    # 清理连续的空格，但保留换行符
+    # 使用 [^\S\n]+ 匹配除换行符外的所有空白字符
+    cleaned_text = re.sub(r'[^\S\n]+', ' ', cleaned_text).strip()
     
     return cleaned_text
 
