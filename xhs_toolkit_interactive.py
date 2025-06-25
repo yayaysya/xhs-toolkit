@@ -196,7 +196,10 @@ class InteractiveMenu:
             elif choice in page_map:
                 page = page_map[choice]
                 safe_print(f"\n🌐 正在打开页面...")
-                manual_command("browser", page=page, stay_open=True)
+                result = manual_command("browser", page=page, stay_open=True)
+                if not result:
+                    safe_print("❌ 打开浏览器失败")
+                    input("\n按回车键继续...")
             else:
                 safe_print("❌ 无效选择")
                 time.sleep(1)

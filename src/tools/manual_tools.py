@@ -151,10 +151,13 @@ class ManualTools:
         
         try:
             # 验证cookies
-            if not self.cookie_manager.validate_cookies():
+            safe_print("🔍 验证Cookies...")
+            cookies_valid = self.cookie_manager.validate_cookies()
+            if not cookies_valid:
                 safe_print("❌ Cookies验证失败，请先获取有效的Cookies")
-                safe_print("💡 运行: python xhs_toolkit.py cookie save")
+                safe_print("💡 运行: ./xhs 然后选择 Cookie管理 -> 获取新的Cookies")
                 return False
+            safe_print("✅ Cookies验证通过")
             
             # 获取页面URL
             url = page_urls.get(page)
@@ -164,9 +167,11 @@ class ManualTools:
                 return False
             
             # 初始化浏览器
+            safe_print("🚀 初始化浏览器...")
             self.browser_manager = ChromeDriverManager(self.config)
             
             # 创建浏览器并加载cookies
+            safe_print("🌐 创建浏览器实例...")
             driver = self.browser_manager.create_driver()
             cookies = self.cookie_manager.load_cookies()
             
