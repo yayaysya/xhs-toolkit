@@ -742,7 +742,10 @@ class CookieManager:
             
             logger.info(f"✅ 找到关键创作者cookies: {found_cookies}")
             
-            missing = set(CRITICAL_CREATOR_COOKIES[:4]) - set(found_cookies)  # 检查基础cookies
+            # 定义真正关键的cookies（必须存在的）
+            must_have_cookies = ['a1', 'webId', 'galaxy_creator_session_id', 
+                               'galaxy.creator.beaker.session.id', 'gid']
+            missing = set(must_have_cookies) - set(found_cookies)  # 检查必须的cookies
             if missing:
                 logger.warning(f"⚠️ 缺少重要cookies: {list(missing)}")
                 logger.warning("💡 这可能导致创作者中心访问失败")
@@ -750,19 +753,27 @@ class CookieManager:
             # 检查过期时间
             current_time = time.time()
             expired_cookies = []
+            expired_critical_cookies = []
             
             for cookie in cookies:
                 expiry = cookie.get('expiry')
+                cookie_name = cookie.get('name')
                 if expiry and expiry < current_time:
-                    expired_cookies.append(cookie.get('name'))
+                    expired_cookies.append(cookie_name)
+                    # 检查是否是关键cookie过期
+                    if cookie_name in CRITICAL_CREATOR_COOKIES:
+                        expired_critical_cookies.append(cookie_name)
             
             if expired_cookies:
                 logger.warning(f"⚠️ 已过期的cookies: {expired_cookies}")
+                if expired_critical_cookies:
+                    logger.warning(f"❌ 关键cookies已过期: {expired_critical_cookies}")
             else:
                 logger.info("✅ 所有cookies都未过期")
             
-            # 综合评估
-            is_valid = len(missing) <= 1 and len(expired_cookies) == 0  # 允许缺少1个非关键cookie
+            # 综合评估 - 更宽松的验证逻辑
+            # 只要没有关键cookies过期，且缺少的关键cookies不超过2个就认为有效
+            is_valid = len(expired_critical_cookies) == 0 and len(missing) <= 2
             
             if is_valid:
                 logger.info("✅ Cookies验证通过，应该可以正常访问创作者中心")
