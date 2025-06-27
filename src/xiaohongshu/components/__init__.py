@@ -8,6 +8,7 @@ from .file_uploader import XHSFileUploader
 from .content_filler import XHSContentFiller
 from .topic_automation import XHSTopicAutomation, AdvancedXHSTopicAutomation
 from .publisher import XHSPublisher
+from .data_collector import XHSDataCollector
 
 __all__ = [
     'XHSFileUploader', 
@@ -15,4 +16,5 @@ __all__ = [
     'XHSTopicAutomation',
     'AdvancedXHSTopicAutomation',
     'XHSPublisher',
+    'XHSDataCollector',
 ] 
