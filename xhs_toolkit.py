@@ -251,68 +251,54 @@ def server_command(action: str, port: int = 8000, host: str = "0.0.0.0") -> bool
         safe_print("💡 可用操作: start, stop, status")
         return False
 
-async def publish_command(title: str, content: str, tags: str = "", 
-                         location: str = "", images: str = "", videos: str = "") -> bool:
+async def publish_command(title: str, content: str, topics: str = "",
+                         location: str = "", images: str = "", videos: str = ""):
     """
-    直接发布命令
+    发布小红书笔记
     
     Args:
         title: 笔记标题
-        content: 笔记内容
-        tags: 标签（逗号分隔）
+        content: 笔记内容  
+        topics: 话题（逗号分隔）
         location: 位置信息
         images: 图片路径（逗号分隔）
         videos: 视频路径（逗号分隔）
-        
-    Returns:
-        发布是否成功
     """
-    safe_print(f"📝 发布笔记: {title}")
+    logger.info("🚀 开始发布小红书笔记")
     
     try:
-        # 检查MCP服务器是否运行
-        import requests
-        try:
-            response = requests.get("http://localhost:3001", timeout=1)
-            safe_print("⚠️ 检测到MCP服务器正在运行，建议通过MCP客户端发布")
-            return False
-        except:
-            pass
+        # 检查和初始化组件
+        await ensure_component_initialization()
         
-        safe_print("📱 启动临时发布会话...")
-        
-        # 初始化配置和客户端
-        config = XHSConfig()
-        client = XHSClient(config)
-        
-        # 创建笔记对象
-        note = XHSNote.from_strings(
+        # 创建笔记对象，使用智能解析
+        note = await XHSNote.async_smart_create(
             title=title,
             content=content,
-            tags_str=tags,
+            topics=topics,
             location=location,
-            images_str=images,
-            videos_str=videos
+            images=images,
+            videos=videos
         )
+        
+        logger.info(f"📝 笔记信息: 标题={note.title}, 话题={note.topics}")
         
         # 发布笔记
         result = await client.publish_note(note)
         
         if result.success:
-            safe_print(f"✅ 笔记发布成功: {result.message}")
+            logger.info(f"✅ 笔记发布成功!")
             if result.final_url:
-                print(f"🔗 页面URL: {result.final_url}")
-            return True
+                logger.info(f"🔗 笔记链接: {result.final_url}")
         else:
-            safe_print(f"❌ 笔记发布失败: {result.message}")
-            return False
-            
-    except XHSToolkitError as e:
-        safe_print(f"❌ 发布失败: {format_error_message(e)}")
-        return False
+            logger.error(f"❌ 笔记发布失败: {result.message}")
+        
+        return result
+        
     except Exception as e:
-        safe_print(f"❌ 发布出现未知错误: {e}")
-        return False
+        logger.error(f"💥 发布过程出错: {e}")
+        import traceback
+        logger.debug(f"详细错误信息: {traceback.format_exc()}")
+        return XHSPublishResult(success=False, message=f"发布异常: {str(e)}")
 
 def config_command(action: str) -> bool:
     """
@@ -428,7 +414,7 @@ def main():
     publish_parser = subparsers.add_parser("publish", help="发布笔记")
     publish_parser.add_argument("title", help="笔记标题")
     publish_parser.add_argument("content", help="笔记内容")
-    publish_parser.add_argument("--tags", default="", help="标签（逗号分隔）")
+    publish_parser.add_argument("--topics", default="", help="话题（逗号分隔）")
     publish_parser.add_argument("--location", default="", help="位置信息")
     publish_parser.add_argument("--images", default="", help="图片路径（逗号分隔）")
     publish_parser.add_argument("--videos", default="", help="视频路径（逗号分隔）")
@@ -459,7 +445,7 @@ def main():
             success = server_command(args.action, args.port, args.host)
         elif args.command == "publish":
             success = asyncio.run(publish_command(
-                args.title, args.content, args.tags, args.location, args.images, args.videos
+                args.title, args.content, args.topics, args.location, args.images, args.videos
             ))
         elif args.command == "config":
             success = config_command(args.action)
