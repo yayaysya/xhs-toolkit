@@ -420,6 +420,10 @@ smart_publish_note(
 - **DOM结构适配**：完全适配小红书真实的话题标签DOM结构
 - **性能优化**：智能等待机制和并发处理，提升自动化效率
 
+### 测试效果
+
+![1.3.0](https://kayin-1253854796.cos.ap-shanghai.myqcloud.com/ownmedia/20250628032152894.gif?imageSlim)
+
 ---
 
 <details>
