@@ -531,6 +531,480 @@ class MCPServer:
                     "message": error_msg
                 }, ensure_ascii=False, indent=2)
         
+        @self.mcp.tool()
+        async def publish_from_json(json_data: str, title: str = None) -> str:
+            """
+            通过JSON字符串发布内容到小红书
+            
+            直接解析JSON字符串，包含封面图片、结尾图片、内容图片数组和文案，
+            然后自动发布到小红书。
+            
+            Args:
+                json_data (str): JSON格式的字符串，包含发布内容
+                title (str, optional): 自定义标题，如果不提供则从文案中提取
+                
+            Returns:
+                str: 任务ID和状态信息
+                
+            JSON格式示例:
+            {
+              "fengmian": "https://example.com/cover.jpg",
+              "neirongtu": ["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
+              "zongjie": "https://example.com/summary.jpg",
+              "jiewei": "https://example.com/end.jpg", 
+              "wenan": "文案内容..."
+            }
+            """
+            logger.info("📝 开始处理JSON数据发布")
+            
+            try:
+                # 解析JSON字符串
+                data = json.loads(json_data)
+                logger.info(f"✅ 成功解析JSON数据，包含字段: {list(data.keys())}")
+                
+                # 验证必需字段
+                required_fields = ['wenan']
+                missing_fields = [field for field in required_fields if field not in data]
+                if missing_fields:
+                    return json.dumps({
+                        "success": False,
+                        "message": f"缺少必需字段: {missing_fields}",
+                        "suggestion": "请确保JSON包含文案内容"
+                    }, ensure_ascii=False, indent=2)
+                
+                # 提取数据
+                content = data['wenan']
+                
+                # 处理标题
+                if not title:
+                    # 从文案中提取第一行作为标题
+                    lines = content.split('\n')
+                    title = lines[0].strip()
+                    if len(title) > 50:
+                        title = title[:47] + "..."
+                
+                # 处理图片
+                images = []
+                
+                # 添加封面图片（如果有）
+                if 'fengmian' in data and data['fengmian']:
+                    images.append(data['fengmian'])
+                    logger.info(f"📸 添加封面图片: {data['fengmian']}")
+                
+                # 添加内容图片
+                if 'neirongtu' in data and data['neirongtu']:
+                    if isinstance(data['neirongtu'], list):
+                        images.extend(data['neirongtu'])
+                    else:
+                        images.append(data['neirongtu'])
+                    logger.info(f"📸 添加内容图片: {len(data['neirongtu']) if isinstance(data['neirongtu'], list) else 1}张")
+                
+                # 添加总结图片（如果有）
+                if 'zongjie' in data and data['zongjie']:
+                    images.append(data['zongjie'])
+                    logger.info(f"📸 添加总结图片: {data['zongjie']}")
+                
+                # 添加结尾图片（如果有）
+                if 'jiewei' in data and data['jiewei']:
+                    images.append(data['jiewei'])
+                    logger.info(f"📸 添加结尾图片: {data['jiewei']}")
+                
+                # 限制图片数量（小红书最多9张）
+                if len(images) > 9:
+                    logger.warning(f"⚠️ 图片数量超过限制({len(images)}张)，将只使用前9张")
+                    images = images[:9]
+                
+                logger.info(f"📋 解析结果: 标题='{title}', 图片{len(images)}张, 文案长度{len(content)}字符")
+                
+                # 使用现有的智能发布功能
+                note = await XHSNote.async_smart_create(
+                    title=title,
+                    content=content,
+                    images=images if images else None
+                )
+                
+                # 创建异步任务
+                task_id = self.task_manager.create_task(note)
+                
+                # 启动后台任务
+                async_task = asyncio.create_task(self._execute_publish_task(task_id))
+                self.task_manager.running_tasks[task_id] = async_task
+                
+                result = {
+                    "success": True,
+                    "task_id": task_id,
+                    "message": f"JSON数据发布任务已启动，任务ID: {task_id}",
+                    "next_step": f"请使用 check_task_status('{task_id}') 查看进度",
+                    "parsing_info": {
+                        "title": title,
+                        "images_count": len(images),
+                        "content_length": len(content),
+                        "parsed_fields": list(data.keys())
+                    },
+                    "parsing_result": {
+                        "images_parsed": images,
+                        "images_count": len(images),
+                        "content_type": "图文" if images else "纯文本"
+                    }
+                }
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"JSON解析失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON格式是否正确"
+                }, ensure_ascii=False, indent=2)
+                
+            except Exception as e:
+                error_msg = f"处理JSON数据失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON内容和格式是否正确"
+                }, ensure_ascii=False, indent=2)
+        
+        @self.mcp.tool()
+        async def batch_publish_from_json(json_data: str, max_items: int = 5) -> str:
+            """
+            批量处理JSON字符串中的多个数据条目并发布到小红书
+            
+            支持处理包含多个数据条目的JSON字符串，每个条目都会被发布为独立的小红书笔记。
+            
+            Args:
+                json_data (str): JSON格式的字符串，包含多个发布条目
+                max_items (int): 最大处理条目数，防止一次性发布过多内容
+                
+            Returns:
+                str: 批量任务信息
+                
+            JSON格式示例（多个条目）:
+            [
+              {
+                "fengmian": "https://example.com/cover1.jpg",
+                "neirongtu": ["https://example.com/img1.jpg"],
+                "zongjie": "https://example.com/summary1.jpg",
+                "jiewei": "https://example.com/end1.jpg",
+                "wenan": "第一条文案内容..."
+              },
+              {
+                "fengmian": "https://example.com/cover2.jpg", 
+                "neirongtu": ["https://example.com/img2.jpg"],
+                "zongjie": "https://example.com/summary2.jpg",
+                "jiewei": "https://example.com/end2.jpg",
+                "wenan": "第二条文案内容..."
+              }
+            ]
+            """
+            logger.info(f"📝 开始批量处理JSON数据，最大条目数: {max_items}")
+            
+            try:
+                # 解析JSON字符串
+                data = json.loads(json_data)
+                
+                # 判断是单个条目还是多个条目
+                if isinstance(data, dict):
+                    # 单个条目，转换为列表
+                    items = [data]
+                elif isinstance(data, list):
+                    # 多个条目
+                    items = data
+                else:
+                    return json.dumps({
+                        "success": False,
+                        "message": "JSON格式错误：必须是JSON对象或数组",
+                        "suggestion": "请检查JSON格式"
+                    }, ensure_ascii=False, indent=2)
+                
+                logger.info(f"✅ 成功解析JSON数据，包含 {len(items)} 个条目")
+                
+                # 限制处理数量
+                if len(items) > max_items:
+                    logger.warning(f"⚠️ 条目数量({len(items)})超过限制({max_items})，将只处理前{max_items}个")
+                    items = items[:max_items]
+                
+                # 批量处理
+                task_ids = []
+                success_count = 0
+                failed_count = 0
+                
+                for idx, item in enumerate(items):
+                    try:
+                        logger.info(f"📝 处理第 {idx+1}/{len(items)} 个条目")
+                        
+                        # 验证必需字段
+                        if 'wenan' not in item:
+                            logger.warning(f"⚠️ 第 {idx+1} 个条目缺少文案字段，跳过")
+                            failed_count += 1
+                            continue
+                        
+                        # 提取数据
+                        content = item['wenan']
+                        
+                        # 从文案中提取标题
+                        lines = content.split('\n')
+                        title = lines[0].strip()
+                        if len(title) > 50:
+                            title = title[:47] + "..."
+                        
+                        # 处理图片
+                        images = []
+                        
+                        # 添加封面图片（如果有）
+                        if 'fengmian' in item and item['fengmian']:
+                            images.append(item['fengmian'])
+                        
+                        # 添加内容图片
+                        if 'neirongtu' in item and item['neirongtu']:
+                            if isinstance(item['neirongtu'], list):
+                                images.extend(item['neirongtu'])
+                            else:
+                                images.append(item['neirongtu'])
+                        
+                        # 添加总结图片（如果有）
+                        if 'zongjie' in item and item['zongjie']:
+                            images.append(item['zongjie'])
+                        
+                        # 添加结尾图片（如果有）
+                        if 'jiewei' in item and item['jiewei']:
+                            images.append(item['jiewei'])
+                        
+                        # 限制图片数量
+                        if len(images) > 9:
+                            images = images[:9]
+                        
+                        # 创建笔记
+                        note = await XHSNote.async_smart_create(
+                            title=title,
+                            content=content,
+                            images=images if images else None
+                        )
+                        
+                        # 创建任务
+                        task_id = self.task_manager.create_task(note)
+                        task_ids.append(task_id)
+                        
+                        # 启动后台任务
+                        async_task = asyncio.create_task(self._execute_publish_task(task_id))
+                        self.task_manager.running_tasks[task_id] = async_task
+                        
+                        success_count += 1
+                        logger.info(f"✅ 第 {idx+1} 个条目处理成功，任务ID: {task_id}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ 第 {idx+1} 个条目处理失败: {str(e)}")
+                        failed_count += 1
+                        continue
+                
+                result = {
+                    "success": True,
+                    "message": f"批量处理完成，成功 {success_count} 个，失败 {failed_count} 个",
+                    "batch_info": {
+                        "total_items": len(items),
+                        "success_count": success_count,
+                        "failed_count": failed_count,
+                        "max_items": max_items
+                    },
+                    "task_ids": task_ids,
+                    "next_step": f"请使用 check_task_status('{task_ids[0]}') 查看第一个任务进度" if task_ids else "没有成功创建的任务"
+                }
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"JSON解析失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON格式是否正确"
+                }, ensure_ascii=False, indent=2)
+                
+            except Exception as e:
+                error_msg = f"批量处理JSON数据失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON内容和格式是否正确"
+                }, ensure_ascii=False, indent=2)
+        
+        @self.mcp.tool()
+        async def preview_json_data(json_data: str) -> str:
+            """
+            预览JSON数据内容，不执行发布操作
+            
+            解析JSON字符串，显示解析结果和预览信息，但不执行实际的发布操作。
+            用于在发布前检查JSON格式和内容是否正确。
+            
+            Args:
+                json_data (str): JSON格式的字符串
+                
+            Returns:
+                str: JSON数据预览信息
+            """
+            logger.info("👀 预览JSON数据")
+            
+            try:
+                # 解析JSON字符串
+                data = json.loads(json_data)
+                
+                # 判断是单个条目还是多个条目
+                if isinstance(data, dict):
+                    items = [data]
+                    is_batch = False
+                elif isinstance(data, list):
+                    items = data
+                    is_batch = True
+                else:
+                    return json.dumps({
+                        "success": False,
+                        "message": "JSON格式错误：必须是JSON对象或数组",
+                        "suggestion": "请检查JSON格式"
+                    }, ensure_ascii=False, indent=2)
+                
+                logger.info(f"✅ 成功解析JSON数据，包含 {len(items)} 个条目")
+                
+                # 分析每个条目
+                preview_items = []
+                total_images = 0
+                total_content_length = 0
+                
+                for idx, item in enumerate(items):
+                    try:
+                        # 基本信息
+                        item_info = {
+                            "index": idx + 1,
+                            "has_wenan": "wenan" in item,
+                            "wenan_length": len(item.get("wenan", "")),
+                            "has_fengmian": "fengmian" in item and item["fengmian"],
+                            "has_jiewei": "jiewei" in item and item["jiewei"],
+                            "neirongtu_count": 0,
+                            "total_images": 0,
+                            "title_preview": "",
+                            "content_preview": "",
+                            "status": "valid"
+                        }
+                        
+                        # 处理文案
+                        if "wenan" in item:
+                            content = item["wenan"]
+                            total_content_length += len(content)
+                            
+                            # 提取标题预览
+                            lines = content.split('\n')
+                            title = lines[0].strip()
+                            if len(title) > 50:
+                                title = title[:47] + "..."
+                            item_info["title_preview"] = title
+                            
+                            # 内容预览（前100字符）
+                            content_preview = content[:100]
+                            if len(content) > 100:
+                                content_preview += "..."
+                            item_info["content_preview"] = content_preview
+                        else:
+                            item_info["status"] = "missing_wenan"
+                        
+                        # 处理图片
+                        images = []
+                        
+                        # 封面图片
+                        if "fengmian" in item and item["fengmian"]:
+                            images.append(item["fengmian"])
+                        
+                        # 内容图片
+                        if "neirongtu" in item and item["neirongtu"]:
+                            if isinstance(item["neirongtu"], list):
+                                images.extend(item["neirongtu"])
+                                item_info["neirongtu_count"] = len(item["neirongtu"])
+                            else:
+                                images.append(item["neirongtu"])
+                                item_info["neirongtu_count"] = 1
+                        
+                        # 总结图片
+                        if "zongjie" in item and item["zongjie"]:
+                            images.append(item["zongjie"])
+                            item_info["zongjie"] = True
+                        
+                        # 结尾图片
+                        if "jiewei" in item and item["jiewei"]:
+                            images.append(item["jiewei"])
+                        
+                        item_info["total_images"] = len(images)
+                        total_images += len(images)
+                        
+                        # 检查图片数量限制
+                        if len(images) > 9:
+                            item_info["status"] = "too_many_images"
+                            item_info["warning"] = f"图片数量({len(images)})超过小红书限制(9张)"
+                        
+                        preview_items.append(item_info)
+                        
+                    except Exception as e:
+                        preview_items.append({
+                            "index": idx + 1,
+                            "status": "error",
+                            "error": str(e)
+                        })
+                
+                # 生成预览报告
+                valid_items = [item for item in preview_items if item["status"] == "valid"]
+                invalid_items = [item for item in preview_items if item["status"] != "valid"]
+                
+                result = {
+                    "success": True,
+                    "message": f"JSON数据预览完成，共 {len(items)} 个条目",
+                    "data_info": {
+                        "is_batch": is_batch,
+                        "total_items": len(items),
+                        "valid_items": len(valid_items),
+                        "invalid_items": len(invalid_items)
+                    },
+                    "content_summary": {
+                        "total_images": total_images,
+                        "total_content_length": total_content_length,
+                        "average_content_length": total_content_length // len(items) if items else 0
+                    },
+                    "preview_items": preview_items,
+                    "recommendations": []
+                }
+                
+                # 添加建议
+                if invalid_items:
+                    result["recommendations"].append(f"发现 {len(invalid_items)} 个无效条目，请检查格式")
+                
+                if total_images > 9 * len(items):
+                    result["recommendations"].append("部分条目图片数量超过限制，将自动截取前9张")
+                
+                if not valid_items:
+                    result["recommendations"].append("没有有效的条目可以发布")
+                else:
+                    result["recommendations"].append(f"可以发布 {len(valid_items)} 个条目")
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"JSON解析失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON格式是否正确"
+                }, ensure_ascii=False, indent=2)
+                
+            except Exception as e:
+                error_msg = f"预览JSON数据失败: {str(e)}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "suggestion": "请检查JSON内容和格式是否正确"
+                }, ensure_ascii=False, indent=2)
     
     async def _execute_publish_task(self, task_id: str) -> None:
         """
@@ -545,18 +1019,23 @@ class MCPServer:
             return
         
         try:
+            logger.info(f"🚀 开始执行任务 {task_id}: {task.note.title}")
+            
             # 阶段0：快速验证登录状态（仅检查cookies存在性）
+            logger.info(f"📋 任务 {task_id} - 阶段0: 验证登录状态")
             self.task_manager.update_task(task_id, status="validating", progress=5, message="正在快速验证登录状态...")
             
             try:
                 # 只检查cookies文件是否存在，避免重复的详细验证
                 cookies_file = Path(self.config.cookies_file)
                 if not cookies_file.exists():
+                    error_msg = "❌ 未找到登录cookies，请先登录小红书"
+                    logger.error(f"任务 {task_id}: {error_msg}")
                     self.task_manager.update_task(
                         task_id, 
                         status="failed", 
                         progress=0, 
-                        message="❌ 未找到登录cookies，请先登录小红书",
+                        message=error_msg,
                         result={
                             "success": False,
                             "error_type": "auth_required",
@@ -564,19 +1043,20 @@ class MCPServer:
                             "suggested_command": "请对AI说：'登录小红书'"
                         }
                     )
-                    logger.warning(f"⚠️ 任务 {task_id} 因缺少cookies而停止")
                     return
                 
                 # 快速验证通过，继续发布流程
+                logger.info(f"✅ 任务 {task_id} - 登录状态验证通过")
                 self.task_manager.update_task(task_id, status="initializing", progress=10, message="✅ 登录状态验证通过，正在初始化浏览器...")
                 
             except Exception as e:
-                logger.error(f"❌ 登录状态验证出错: {e}")
+                error_msg = f"❌ 登录状态验证出错: {str(e)}"
+                logger.error(f"任务 {task_id}: {error_msg}")
                 self.task_manager.update_task(
                     task_id, 
                     status="failed", 
                     progress=0, 
-                    message=f"❌ 登录状态验证出错: {str(e)}",
+                    message=error_msg,
                     result={
                         "success": False,
                         "error_type": "validation_error",
@@ -587,58 +1067,209 @@ class MCPServer:
                 return
             
             # 阶段1：初始化浏览器
+            logger.info(f"📋 任务 {task_id} - 阶段1: 初始化浏览器")
+            self.task_manager.update_task(task_id, status="initializing", progress=15, message="正在初始化浏览器驱动...")
+            
             # 创建新的客户端实例，避免并发冲突
             client = XHSClient(self.config)
+            logger.info(f"✅ 任务 {task_id} - 浏览器客户端创建成功")
             
-            # 阶段2：上传文件
+            # 阶段2：启动浏览器并访问发布页面
+            logger.info(f"📋 任务 {task_id} - 阶段2: 启动浏览器")
+            self.task_manager.update_task(task_id, status="browser_starting", progress=20, message="正在启动浏览器...")
+            
+            try:
+                # 创建浏览器驱动
+                driver = client.browser_manager.create_driver()
+                logger.info(f"✅ 任务 {task_id} - 浏览器驱动创建成功")
+                
+                # 导航到创作者中心
+                logger.info(f"📋 任务 {task_id} - 导航到创作者中心")
+                self.task_manager.update_task(task_id, status="navigating", progress=25, message="正在导航到小红书创作者中心...")
+                client.browser_manager.navigate_to_creator_center()
+                logger.info(f"✅ 任务 {task_id} - 导航成功")
+                
+                # 加载cookies
+                logger.info(f"📋 任务 {task_id} - 加载cookies")
+                self.task_manager.update_task(task_id, status="loading_cookies", progress=30, message="正在加载登录状态...")
+                cookies = client.cookie_manager.load_cookies()
+                cookie_result = client.browser_manager.load_cookies(cookies)
+                logger.info(f"✅ 任务 {task_id} - Cookies加载结果: {cookie_result}")
+                
+            except Exception as e:
+                error_msg = f"❌ 浏览器初始化失败: {str(e)}"
+                logger.error(f"任务 {task_id}: {error_msg}")
+                self.task_manager.update_task(
+                    task_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=error_msg,
+                    result={
+                        "success": False,
+                        "error_type": "browser_init_error",
+                        "error": str(e),
+                        "suggested_action": "请检查浏览器配置或重新登录"
+                    }
+                )
+                return
+            
+            # 阶段3：访问发布页面
+            logger.info(f"📋 任务 {task_id} - 阶段3: 访问发布页面")
+            self.task_manager.update_task(task_id, status="accessing_publish_page", progress=35, message="正在访问发布页面...")
+            
+            try:
+                # 访问发布页面
+                driver.get("https://creator.xiaohongshu.com/publish/publish?from=menu")
+                logger.info(f"✅ 任务 {task_id} - 发布页面访问成功")
+                await asyncio.sleep(5)  # 等待页面基本加载
+                
+                if "publish" not in driver.current_url:
+                    error_msg = "无法访问发布页面，可能需要重新登录"
+                    logger.error(f"任务 {task_id}: {error_msg}")
+                    raise Exception(error_msg)
+                
+                logger.info(f"✅ 任务 {task_id} - 页面URL验证通过: {driver.current_url}")
+                
+            except Exception as e:
+                error_msg = f"❌ 访问发布页面失败: {str(e)}"
+                logger.error(f"任务 {task_id}: {error_msg}")
+                self.task_manager.update_task(
+                    task_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=error_msg,
+                    result={
+                        "success": False,
+                        "error_type": "page_access_error",
+                        "error": str(e),
+                        "suggested_action": "请重新登录小红书"
+                    }
+                )
+                return
+            
+            # 阶段4：切换发布模式
+            logger.info(f"📋 任务 {task_id} - 阶段4: 切换发布模式")
+            self.task_manager.update_task(task_id, status="switching_mode", progress=40, message="正在切换发布模式...")
+            
+            try:
+                # 根据内容类型切换发布模式
+                has_images = task.note.images and len(task.note.images) > 0
+                has_videos = task.note.videos and len(task.note.videos) > 0
+                
+                if has_images:
+                    logger.info(f"📋 任务 {task_id} - 切换到图文发布模式")
+                    await client._switch_publish_mode(task.note)
+                elif has_videos:
+                    logger.info(f"📋 任务 {task_id} - 切换到视频发布模式")
+                    await client._switch_publish_mode(task.note)
+                else:
+                    logger.info(f"📋 任务 {task_id} - 纯文本发布模式")
+                
+                logger.info(f"✅ 任务 {task_id} - 发布模式设置完成")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ 任务 {task_id} - 模式切换警告: {e}，继续执行...")
+            
+            # 阶段5：处理文件上传
             if task.note.images or task.note.videos:
-                self.task_manager.update_task(task_id, status="uploading", progress=20, message="正在上传文件...")
+                logger.info(f"📋 任务 {task_id} - 阶段5: 处理文件上传")
+                self.task_manager.update_task(task_id, status="uploading", progress=50, message="正在上传文件...")
                 
-                # 执行发布过程
-                result = await client.publish_note(task.note)
+                try:
+                    await client._handle_file_upload(task.note)
+                    logger.info(f"✅ 任务 {task_id} - 文件上传处理完成")
+                    
+                    # 等待上传完成
+                    if task.note.videos:
+                        logger.info(f"📋 任务 {task_id} - 等待视频上传完成")
+                        self.task_manager.update_task(task_id, status="waiting_upload", progress=60, message="正在等待视频上传完成...")
+                        await client._wait_for_video_upload_complete()
+                    else:
+                        logger.info(f"📋 任务 {task_id} - 等待图片上传完成")
+                        self.task_manager.update_task(task_id, status="waiting_upload", progress=60, message="正在等待图片上传完成...")
+                        await asyncio.sleep(3)
+                    
+                    logger.info(f"✅ 任务 {task_id} - 文件上传完成")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ 任务 {task_id} - 文件上传警告: {e}，继续执行...")
+            
+            # 阶段6：填写笔记内容
+            logger.info(f"📋 任务 {task_id} - 阶段6: 填写笔记内容")
+            self.task_manager.update_task(task_id, status="filling_content", progress=70, message="正在填写笔记内容...")
+            
+            try:
+                await client._fill_note_content(task.note)
+                logger.info(f"✅ 任务 {task_id} - 内容填写完成")
+                
+            except Exception as e:
+                error_msg = f"❌ 填写内容失败: {str(e)}"
+                logger.error(f"任务 {task_id}: {error_msg}")
+                self.task_manager.update_task(
+                    task_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=error_msg,
+                    result={
+                        "success": False,
+                        "error_type": "content_fill_error",
+                        "error": str(e),
+                        "suggested_action": "请检查内容格式"
+                    }
+                )
+                return
+            
+            # 阶段7：提交发布
+            logger.info(f"📋 任务 {task_id} - 阶段7: 提交发布")
+            self.task_manager.update_task(task_id, status="publishing", progress=80, message="正在提交发布...")
+            
+            try:
+                result = await client._submit_note(task.note)
+                logger.info(f"✅ 任务 {task_id} - 发布提交完成")
                 
                 if result.success:
+                    success_msg = "🎉 发布成功！"
+                    logger.info(f"任务 {task_id}: {success_msg}")
                     self.task_manager.update_task(
                         task_id, 
                         status="completed", 
                         progress=100, 
-                        message="发布成功！",
+                        message=success_msg,
                         result=result.to_dict()
                     )
                 else:
+                    error_msg = f"❌ 发布失败: {result.message}"
+                    logger.error(f"任务 {task_id}: {error_msg}")
                     self.task_manager.update_task(
                         task_id, 
                         status="failed", 
                         progress=0, 
-                        message=f"发布失败: {result.message}",
+                        message=error_msg,
                         result=result.to_dict()
                     )
-            else:
-                # 没有文件的快速发布
-                self.task_manager.update_task(task_id, status="publishing", progress=60, message="正在发布笔记...")
                 
-                result = await client.publish_note(task.note)
-                
-                if result.success:
-                    self.task_manager.update_task(
-                        task_id, 
-                        status="completed", 
-                        progress=100, 
-                        message="发布成功！",
-                        result=result.to_dict()
-                    )
-                else:
-                    self.task_manager.update_task(
-                        task_id, 
-                        status="failed", 
-                        progress=0, 
-                        message=f"发布失败: {result.message}",
-                        result=result.to_dict()
-                    )
+            except Exception as e:
+                error_msg = f"❌ 提交发布失败: {str(e)}"
+                logger.error(f"任务 {task_id}: {error_msg}")
+                self.task_manager.update_task(
+                    task_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=error_msg,
+                    result={
+                        "success": False,
+                        "error_type": "submit_error",
+                        "error": str(e),
+                        "suggested_action": "请检查网络连接和登录状态"
+                    }
+                )
+                return
                 
         except Exception as e:
             error_msg = f"任务执行失败: {str(e)}"
             logger.error(f"❌ 任务 {task_id} 执行失败: {e}")
+            import traceback
+            logger.error(f"任务 {task_id} 错误详情: {traceback.format_exc()}")
             self.task_manager.update_task(
                 task_id, 
                 status="failed", 
@@ -650,6 +1281,7 @@ class MCPServer:
             # 清理运行任务记录
             if task_id in self.task_manager.running_tasks:
                 del self.task_manager.running_tasks[task_id]
+            logger.info(f"🏁 任务 {task_id} 执行结束")
 
     def _setup_resources(self) -> None:
         """设置MCP资源"""
@@ -673,15 +1305,15 @@ class MCPServer:
 - 功能: 测试MCP连接
 - 参数: 无
 
-### 2. start_publish_task
-- 功能: 启动异步发布任务（解决MCP超时问题）
+### 2. smart_publish_note
+- 功能: 智能发布小红书笔记（支持多种输入格式）
 - 参数:
   - title: 笔记标题
   - content: 笔记内容
-  - tags: 标签（逗号分隔）
+  - images: 图片（支持本地路径、网络URL、混合数组）
+  - videos: 视频路径（目前仅支持本地文件）
+  - topics: 话题（支持字符串或数组格式）
   - location: 位置信息
-  - images: 图片路径（逗号分隔多个路径）
-  - videos: 视频路径（逗号分隔多个路径）
 
 ### 3. check_task_status
 - 功能: 检查发布任务状态
@@ -693,15 +1325,67 @@ class MCPServer:
 - 参数:
   - task_id: 任务ID
 
-### 5. close_browser
-- 功能: 关闭浏览器
-
-### 6. test_publish_params
-- 功能: 测试发布参数解析（调试用）
+### 5. login_xiaohongshu
+- 功能: 智能登录小红书
 - 参数:
-  - title: 测试标题
-  - content: 测试内容
-  - image_path: 测试图片路径
+  - force_relogin: 是否强制重新登录
+  - quick_mode: 快速模式
+
+### 6. get_creator_data_analysis
+- 功能: 获取创作者数据用于分析
+- 参数: 无
+
+### 7. publish_from_json
+- 功能: 通过JSON字符串发布内容到小红书
+- 参数:
+  - json_data: JSON格式的字符串，包含发布内容
+  - title: 自定义标题（可选，不提供则从文案中提取）
+
+### 8. batch_publish_from_json
+- 功能: 批量处理JSON字符串中的多个数据条目并发布到小红书
+- 参数:
+  - json_data: JSON格式的字符串，包含多个发布条目
+  - max_items: 最大处理条目数（默认: 5）
+
+### 9. preview_json_data
+- 功能: 预览JSON数据内容，不执行发布操作
+- 参数:
+  - json_data: JSON格式的字符串
+
+## JSON数据格式
+
+### 单个条目格式:
+```json
+{
+  "fengmian": "https://example.com/cover.jpg",
+  "jiewei": "https://example.com/end.jpg",
+  "neirongtu": ["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
+  "wenan": "文案内容..."
+}
+```
+
+### 批量条目格式:
+```json
+[
+  {
+    "fengmian": "https://example.com/cover1.jpg",
+    "neirongtu": ["https://example.com/img1.jpg"],
+    "wenan": "第一条文案内容..."
+  },
+  {
+    "fengmian": "https://example.com/cover2.jpg",
+    "neirongtu": ["https://example.com/img2.jpg"],
+    "wenan": "第二条文案内容..."
+  }
+]
+```
+
+## 字段说明
+
+- **fengmian**: 封面图片URL（可选）
+- **jiewei**: 结尾图片URL（可选）
+- **neirongtu**: 内容图片URL数组（可选）
+- **wenan**: 文案内容（必需）
 
 ## 可用资源
 
@@ -713,6 +1397,15 @@ class MCPServer:
 - CHROME_PATH: Chrome浏览器路径
 - WEBDRIVER_CHROME_DRIVER: ChromeDriver路径
 - json_path: Cookies文件路径
+- ENABLE_AUTO_COLLECTION: 是否启用自动数据采集
+
+## 使用流程
+
+1. 使用 `login_xiaohongshu()` 登录小红书
+2. 使用 `preview_json_data()` 预览JSON数据内容
+3. 使用 `publish_from_json()` 或 `batch_publish_from_json()` 发布内容
+4. 使用 `check_task_status()` 查看发布进度
+5. 使用 `get_task_result()` 获取发布结果
 """
             return help_text
     
@@ -813,7 +1506,7 @@ class MCPServer:
         # 工具已在__init__中注册
         logger.info(f"🎯 MCP工具列表:")
         for tool in ["test_connection", "smart_publish_note", "check_task_status", 
-                    "get_task_result", "login_xiaohongshu", "get_creator_data_analysis"]:
+                    "get_task_result", "login_xiaohongshu", "get_creator_data_analysis", "publish_from_result_file", "batch_publish_from_result_files", "preview_result_file"]:
             logger.info(f"   • {tool}")
         
         # 初始化数据采集（如果启用）
@@ -879,6 +1572,9 @@ class MCPServer:
         logger.info("   • get_task_result - 获取已完成任务的结果")
         logger.info("   • login_xiaohongshu - 智能登录小红书")
         logger.info("   • get_creator_data_analysis - 获取创作者数据用于分析")
+        logger.info("   • publish_from_json - 通过JSON字符串发布内容到小红书")
+        logger.info("   • batch_publish_from_json - 批量处理JSON字符串中的多个数据条目并发布到小红书")
+        logger.info("   • preview_json_data - 预览JSON数据内容，不执行发布操作")
         
         logger.info("🔧 按 Ctrl+C 停止服务器")
         logger.info("💡 终止时的ASGI错误信息是正常现象，可以忽略")

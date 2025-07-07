@@ -1,0 +1,10 @@
+{
+  "fengmian": "https://p9-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/415485d9ef724f46bcaa3fced8697108.png~tplv-mdko3gqilj-image.png?rk3s=c8fe7ad5&x-expires=1782805407&x-signature=MpgRl8lxEZAATai1%2BTKDEOZPwdY%3D",
+  "jiewei": "https://p3-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/da17eb6e7c4b4ddb864f1489fe7d1bad.png~tplv-mdko3gqilj-image.png?rk3s=c8fe7ad5&x-expires=1782805391&x-signature=SLmQXdatPZ1L6RvsiLhjS68pUeQ%3D",
+  "neirongtu": [
+    "https://p9-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/a26727e8c65a42b0b4dd4580bd5f8ada.png~tplv-mdko3gqilj-image.png?rk3s=c8fe7ad5&x-expires=1782805390&x-signature=Fh6JLrOmBPpIZCdXM67wAaApPoA%3D",
+    "https://p3-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/e27a6ff6fd6546188bd9e9d8a6240191.png~tplv-mdko3gqilj-image.png?rk3s=c8fe7ad5&x-expires=1782805390&x-signature=ID3Kt3Aes%2Bp3UvIDfNVkzWWQy%2BA%3D",
+    "https://p3-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/7ab7fb7117d24583bf857c719c58ec8f.png~tplv-mdko3gqilj-image.png?rk3s=c8fe7ad5&x-expires=1782805391&x-signature=H3KEOBudXSgfRTAJFSa9O0fYHDk%3D"
+  ],
+  "wenan": "🧠亲子沟通有妙招，这样说话孩子才会听\n\n各位家长好，我是小燕老师。\n在亲子沟通中，家长们常常苦恼于孩子不听话、不配合。但从儿童心理学角度看，这背后的真相其实是：沟通方式不当，才导致孩子产生对抗情绪。\n\n① 先处理情绪再解决问题 ❤️\n• ❌ 别这样说：“你怎么就是不听话！非要我发火是不是！”\n• ✅ 可以试试：“妈妈现在有点着急，我们一起深呼吸好吗？”\n• ✅ 或者这样说：“我们暂停5分钟，等平静了再聊”\n• 🔬 听听原理：镜像神经元理论显示，孩子的情绪会被家长状态同步。当父母先调整情绪状态，孩子会自动降低防御对抗模式。\n\n② 用具体指令替代情绪宣泄 📖\n• ❌ 别这样说：“跟你说了多少遍就是不听！”\n• ✅ 可以试试：“先把玩具放回盒子，再一起读绘本好吗？”\n• ✅ 或者这样说：“先关掉iPad，然后我们讨论看多久合适”\n• 🔬 听听原理：前额叶未发育成熟的孩子无法处理模糊指令。将要求拆解成可执行的步骤，能减少认知负荷引发的对抗。\n\n③ 强化合作而非对抗 ➡️\n• ❌ 别这样说：“再这样我永远不管你了！”\n• ✅ 可以试试：“谢谢你配合妈妈收拾玩具，真贴心”\n• ✅ 或者这样说：“刚才你自己关电视的动作特别帅！”\n• 🔬 听听原理：行为塑造理论表明，强化积极行为比惩罚错误更有效。每句具体赞美都在增加孩子的合作账户存款。\n\n💡小燕老师总结：\n掌握科学的亲子沟通方法，先处理情绪、用具体指令、强化合作，能有效减少亲子间的对抗，让沟通更加顺畅。\n\n#育儿 #儿童心理学 #高情商 #亲子沟通 #家庭教育 #科学育儿 #小燕老师育儿经"
+}
