@@ -549,11 +549,21 @@ class MCPServer:
             JSON格式示例:
             {
               "fengmian": "https://example.com/cover.jpg",
+              "fengmian_pic": "https://example.com/cover_after.jpg",
               "neirongtu": ["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
               "zongjie": "https://example.com/summary.jpg",
               "jiewei": "https://example.com/end.jpg", 
-              "wenan": "文案内容..."
+              "wenan": "文案内容 #测试话题 #小红书",
+              "topics": ["话题1", "话题2"]
             }
+            
+            图片排序：fengmian → fengmian_pic → neirongtu → zongjie → jiewei
+            
+            注意：
+            - 话题会从两个地方提取：文案中的#标签和topics字段
+            - topics字段优先级更高
+            - 支持从文案内容自动提取#开头的话题标签
+            - fengmian_pic是可选字段，会插入在封面图之后、内容图之前
             """
             logger.info("📝 开始处理JSON数据发布")
             
@@ -573,15 +583,51 @@ class MCPServer:
                     }, ensure_ascii=False, indent=2)
                 
                 # 提取数据
-                content = data['wenan']
+                original_content = data['wenan']
+                
+                # 从文案内容中提取话题标签并清理内容
+                from ..utils.text_utils import extract_and_clean_topics_from_content
+                cleaned_content, extracted_topics = extract_and_clean_topics_from_content(original_content)
+                logger.info(f"🏷️ 从文案中提取到话题: {extracted_topics}")
+                logger.info(f"📝 清理后的文案长度: {len(cleaned_content)} 字符")
+                
+                # 使用清理后的内容
+                content = cleaned_content
                 
                 # 处理标题
                 if not title:
-                    # 从文案中提取第一行作为标题
+                    # 从清理后的文案中提取第一行作为标题
                     lines = content.split('\n')
                     title = lines[0].strip()
                     if len(title) > 50:
                         title = title[:47] + "..."
+                
+                # 也支持从JSON中直接提供话题字段
+                json_topics = []
+                if 'topics' in data and data['topics']:
+                    if isinstance(data['topics'], list):
+                        json_topics = [str(topic).strip() for topic in data['topics'] if str(topic).strip()]
+                    elif isinstance(data['topics'], str):
+                        json_topics = [topic.strip() for topic in data['topics'].split(',') if topic.strip()]
+                    logger.info(f"🏷️ 从JSON中获取到话题: {json_topics}")
+                
+                # 合并话题（优先使用JSON中的话题，然后添加从文案中提取的话题）
+                final_topics = []
+                seen_topics = set()
+                
+                # 先添加JSON中的话题
+                for topic in json_topics:
+                    if topic not in seen_topics:
+                        final_topics.append(topic)
+                        seen_topics.add(topic)
+                
+                # 再添加从文案中提取的话题
+                for topic in extracted_topics:
+                    if topic not in seen_topics:
+                        final_topics.append(topic)
+                        seen_topics.add(topic)
+                
+                logger.info(f"🏷️ 最终话题列表: {final_topics}")
                 
                 # 处理图片
                 images = []
@@ -590,6 +636,11 @@ class MCPServer:
                 if 'fengmian' in data and data['fengmian']:
                     images.append(data['fengmian'])
                     logger.info(f"📸 添加封面图片: {data['fengmian']}")
+                
+                # 添加封面后图片（如果有）- 新增支持
+                if 'fengmian_pic' in data and data['fengmian_pic']:
+                    images.append(data['fengmian_pic'])
+                    logger.info(f"📸 添加封面后图片: {data['fengmian_pic']}")
                 
                 # 添加内容图片
                 if 'neirongtu' in data and data['neirongtu']:
@@ -614,13 +665,25 @@ class MCPServer:
                     logger.warning(f"⚠️ 图片数量超过限制({len(images)}张)，将只使用前9张")
                     images = images[:9]
                 
-                logger.info(f"📋 解析结果: 标题='{title}', 图片{len(images)}张, 文案长度{len(content)}字符")
+                logger.info(f"📋 解析结果: 标题='{title}', 图片{len(images)}张, 文案长度{len(content)}字符, 话题{len(final_topics)}个")
+                
+                # 获取cookies用于图片下载
+                cookies = None
+                try:
+                    from ..auth.cookie_manager import CookieManager
+                    cookie_manager = CookieManager(self.config)
+                    cookies = cookie_manager.load_cookies()
+                    logger.debug(f"🍪 获取到 {len(cookies)} 个cookies用于图片下载")
+                except Exception as e:
+                    logger.warning(f"⚠️ 获取cookies失败: {e}，图片下载可能受影响")
                 
                 # 使用现有的智能发布功能
                 note = await XHSNote.async_smart_create(
                     title=title,
                     content=content,
-                    images=images if images else None
+                    images=images if images else None,
+                    topics=final_topics if final_topics else None,
+                    cookies=cookies
                 )
                 
                 # 创建异步任务
@@ -686,19 +749,23 @@ class MCPServer:
             [
               {
                 "fengmian": "https://example.com/cover1.jpg",
+                "fengmian_pic": "https://example.com/cover1_after.jpg",
                 "neirongtu": ["https://example.com/img1.jpg"],
                 "zongjie": "https://example.com/summary1.jpg",
                 "jiewei": "https://example.com/end1.jpg",
                 "wenan": "第一条文案内容..."
               },
               {
-                "fengmian": "https://example.com/cover2.jpg", 
+                "fengmian": "https://example.com/cover2.jpg",
+                "fengmian_pic": "https://example.com/cover2_after.jpg", 
                 "neirongtu": ["https://example.com/img2.jpg"],
                 "zongjie": "https://example.com/summary2.jpg",
                 "jiewei": "https://example.com/end2.jpg",
                 "wenan": "第二条文案内容..."
               }
             ]
+            
+            图片排序：fengmian → fengmian_pic → neirongtu → zongjie → jiewei
             """
             logger.info(f"📝 开始批量处理JSON数据，最大条目数: {max_items}")
             
@@ -743,13 +810,44 @@ class MCPServer:
                             continue
                         
                         # 提取数据
-                        content = item['wenan']
+                        original_content = item['wenan']
                         
-                        # 从文案中提取标题
+                        # 从文案内容中提取话题标签并清理内容
+                        from ..utils.text_utils import extract_and_clean_topics_from_content
+                        cleaned_content, extracted_topics = extract_and_clean_topics_from_content(original_content)
+                        
+                        # 使用清理后的内容
+                        content = cleaned_content
+                        
+                        # 从清理后的文案中提取标题
                         lines = content.split('\n')
                         title = lines[0].strip()
                         if len(title) > 50:
                             title = title[:47] + "..."
+                        
+                        # 也支持从JSON中直接提供话题字段
+                        json_topics = []
+                        if 'topics' in item and item['topics']:
+                            if isinstance(item['topics'], list):
+                                json_topics = [str(topic).strip() for topic in item['topics'] if str(topic).strip()]
+                            elif isinstance(item['topics'], str):
+                                json_topics = [topic.strip() for topic in item['topics'].split(',') if topic.strip()]
+                        
+                        # 合并话题
+                        final_topics = []
+                        seen_topics = set()
+                        
+                        # 先添加JSON中的话题
+                        for topic in json_topics:
+                            if topic not in seen_topics:
+                                final_topics.append(topic)
+                                seen_topics.add(topic)
+                        
+                        # 再添加从文案中提取的话题
+                        for topic in extracted_topics:
+                            if topic not in seen_topics:
+                                final_topics.append(topic)
+                                seen_topics.add(topic)
                         
                         # 处理图片
                         images = []
@@ -757,6 +855,10 @@ class MCPServer:
                         # 添加封面图片（如果有）
                         if 'fengmian' in item and item['fengmian']:
                             images.append(item['fengmian'])
+                        
+                        # 添加封面后图片（如果有）- 新增支持
+                        if 'fengmian_pic' in item and item['fengmian_pic']:
+                            images.append(item['fengmian_pic'])
                         
                         # 添加内容图片
                         if 'neirongtu' in item and item['neirongtu']:
@@ -777,11 +879,22 @@ class MCPServer:
                         if len(images) > 9:
                             images = images[:9]
                         
+                        # 获取cookies用于图片下载
+                        cookies = None
+                        try:
+                            from ..auth.cookie_manager import CookieManager
+                            cookie_manager = CookieManager(self.config)
+                            cookies = cookie_manager.load_cookies()
+                        except Exception as e:
+                            logger.warning(f"⚠️ 获取cookies失败: {e}")
+                        
                         # 创建笔记
                         note = await XHSNote.async_smart_create(
                             title=title,
                             content=content,
-                            images=images if images else None
+                            images=images if images else None,
+                            topics=final_topics if final_topics else None,
+                            cookies=cookies
                         )
                         
                         # 创建任务
@@ -916,6 +1029,13 @@ class MCPServer:
                         # 封面图片
                         if "fengmian" in item and item["fengmian"]:
                             images.append(item["fengmian"])
+                        
+                        # 封面后图片（新增支持）
+                        if "fengmian_pic" in item and item["fengmian_pic"]:
+                            images.append(item["fengmian_pic"])
+                            item_info["has_fengmian_pic"] = True
+                        else:
+                            item_info["has_fengmian_pic"] = False
                         
                         # 内容图片
                         if "neirongtu" in item and item["neirongtu"]:

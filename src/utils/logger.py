@@ -14,16 +14,18 @@ from loguru import logger
 class LoggerConfig:
     """日志配置管理器"""
     
-    def __init__(self, log_level: str = "INFO", log_file: str = "xhs_toolkit.log"):
+    def __init__(self, log_level: str = "INFO", log_file: Optional[str] = "xhs_toolkit.log", log_to_console: bool = True):
         """
         初始化日志配置
         
         Args:
             log_level: 日志级别
-            log_file: 日志文件路径
+            log_file: 日志文件路径. 如果为 None, 则不输出到文件.
+            log_to_console: 是否输出到控制台.
         """
         self.log_level = log_level.upper()
         self.log_file = log_file
+        self.log_to_console = log_to_console
         self._setup_loguru()
         self._setup_third_party_loggers()
     
@@ -33,22 +35,24 @@ class LoggerConfig:
         logger.remove()
         
         # 添加控制台输出
-        logger.add(
-            sys.stderr,
-            level=self.log_level,
-            format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | <level>{message}</level>",
-            colorize=True
-        )
+        if self.log_to_console:
+            logger.add(
+                sys.stderr,
+                level=self.log_level,
+                format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | <level>{message}</level>",
+                colorize=True
+            )
         
         # 添加文件输出
-        logger.add(
-            self.log_file,
-            rotation="10 MB",
-            retention="7 days",
-            level=self.log_level,
-            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}",
-            encoding="utf-8"
-        )
+        if self.log_file:
+            logger.add(
+                self.log_file,
+                rotation="10 MB",
+                retention="7 days",
+                level=self.log_level,
+                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}",
+                encoding="utf-8"
+            )
         
         # 如果是DEBUG级别，输出详细信息
         if self.log_level == "DEBUG":
@@ -108,23 +112,24 @@ class LoggerConfig:
 _logger_config: Optional[LoggerConfig] = None
 
 
-def setup_logger(log_level: str = None, log_file: str = None) -> None:
+def setup_logger(log_level: str = None, log_file: Optional[str] = None, log_to_console: bool = True) -> None:
     """
     设置全局日志配置
     
     Args:
         log_level: 日志级别，默认从环境变量LOG_LEVEL获取
-        log_file: 日志文件，默认为xhs_toolkit.log
+        log_file: 日志文件，默认为xhs_toolkit.log. 设置为None可禁用.
+        log_to_console: 是否输出到控制台.
     """
     global _logger_config
     
     if log_level is None:
         log_level = os.getenv("LOG_LEVEL", "INFO")
     
-    if log_file is None:
-        log_file = "xhs_toolkit.log"
+    if log_file is None and 'log_to_file' not in locals():
+         log_file = "xhs_toolkit.log"
     
-    _logger_config = LoggerConfig(log_level, log_file)
+    _logger_config = LoggerConfig(log_level, log_file, log_to_console)
 
 
 def get_logger(name: Optional[str] = None) -> Any:

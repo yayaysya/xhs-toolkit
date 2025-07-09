@@ -62,6 +62,110 @@ def truncate_text(text: str, max_length: int, suffix: str = "...") -> str:
     return text[:max_length - len(suffix)] + suffix
 
 
+def extract_topics_from_content(content: str) -> List[str]:
+    """
+    从文案内容中提取话题标签
+    
+    提取以#开头的话题标签，支持中文、英文、数字等
+    
+    Args:
+        content: 文案内容
+        
+    Returns:
+        话题列表（不包含#号）
+        
+    Examples:
+        extract_topics_from_content("今天天气很好 #天气 #心情好 #生活分享")
+        # 返回: ["天气", "心情好", "生活分享"]
+    """
+    if not content:
+        return []
+    
+    # 使用正则表达式匹配#话题标签
+    # 匹配模式：#后跟非空白字符，直到遇到空白字符、换行或字符串结束
+    pattern = r'#([^\s#]+)'
+    matches = re.findall(pattern, content)
+    
+    if not matches:
+        return []
+    
+    # 清理和去重话题
+    topics = []
+    seen = set()
+    
+    for topic in matches:
+        # 清理话题名（去掉可能的标点符号）
+        cleaned_topic = re.sub(r'[^\w\u4e00-\u9fff]', '', topic)  # 保留中文、英文、数字
+        
+        if cleaned_topic and cleaned_topic not in seen:
+            topics.append(cleaned_topic)
+            seen.add(cleaned_topic)
+    
+    return topics
+
+
+def extract_and_clean_topics_from_content(content: str) -> tuple[str, List[str]]:
+    """
+    从文案内容中提取话题标签，并返回清理后的文案内容
+    
+    提取以#开头的话题标签，同时从原文案中删除这些标签
+    
+    Args:
+        content: 文案内容
+        
+    Returns:
+        tuple: (清理后的文案内容, 话题列表)
+        
+    Examples:
+        extract_and_clean_topics_from_content("今天天气很好 #天气 #心情好 #生活分享")
+        # 返回: ("今天天气很好", ["天气", "心情好", "生活分享"])
+    """
+    if not content:
+        return content, []
+    
+    # 使用正则表达式匹配#话题标签
+    pattern = r'#([^\s#]+)'
+    matches = re.findall(pattern, content)
+    
+    if not matches:
+        return content, []
+    
+    # 清理和去重话题
+    topics = []
+    seen = set()
+    
+    for topic in matches:
+        # 清理话题名（去掉可能的标点符号）
+        cleaned_topic = re.sub(r'[^\w\u4e00-\u9fff]', '', topic)  # 保留中文、英文、数字
+        
+        if cleaned_topic and cleaned_topic not in seen:
+            topics.append(cleaned_topic)
+            seen.add(cleaned_topic)
+    
+    # 从原内容中删除所有#话题标签
+    cleaned_content = re.sub(r'#[^\s#]+', '', content)
+    
+    # 更精细的空格和换行处理
+    # 1. 首先保护双换行（段落分隔）
+    cleaned_content = re.sub(r'\n\s*\n', '\n\n', cleaned_content)
+    
+    # 2. 清理单行内的多余空格，但保留换行
+    lines = cleaned_content.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        # 清理每行内的多余空格
+        cleaned_line = re.sub(r'\s+', ' ', line).strip()
+        cleaned_lines.append(cleaned_line)
+    
+    # 3. 重新组合，保持原有的换行结构
+    cleaned_content = '\n'.join(cleaned_lines)
+    
+    # 4. 清理开头和结尾的空白，但保留内部段落结构
+    cleaned_content = cleaned_content.strip()
+    
+    return cleaned_content, topics
+
+
 def parse_topics_string(topics_string: str) -> List[str]:
     """
     解析话题字符串

@@ -68,6 +68,15 @@ class XHSConfig:
         self.debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
         self.headless = os.getenv("HEADLESS", "false").lower() == "true"  # 无头浏览器模式
         
+        # 用户代理
+        self.user_agent = os.getenv(
+            "USER_AGENT",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        )
+        
+        # 代理配置
+        self.proxy = os.getenv("PROXY", None)
+
         # 其他配置
         self.timeout = int(os.getenv("TIMEOUT", "30"))
     
@@ -221,6 +230,12 @@ DEBUG_MODE=false
 # 无头浏览器模式（true=启用无头模式，false=显示浏览器界面）
 HEADLESS=false
 
+# 用户代理
+USER_AGENT={self.user_agent}
+
+# 代理配置
+PROXY={self.proxy}
+
 # 超时设置（秒）
 TIMEOUT=30
 """
@@ -258,6 +273,8 @@ TIMEOUT=30
             "disable_images": self.disable_images,
             "debug_mode": self.debug_mode,
             "headless": self.headless,
+            "user_agent": self.user_agent,
+            "proxy": self.proxy,
             "timeout": self.timeout,
             "platform": platform.system(),
             "python_version": platform.python_version()

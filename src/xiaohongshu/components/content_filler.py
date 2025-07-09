@@ -360,15 +360,23 @@ class XHSContentFiller(IContentFiller):
             
             logger.info(f"✅ 找到内容编辑器，开始添加 {len(topics)} 个话题")
             
-            # 2. 确保编辑器获得焦点并移动到末尾
+            # 2. 确保编辑器获得焦点并移动到文章内容真正的末尾
             content_editor.click()
             await asyncio.sleep(0.3)
+            
+            # 使用 Ctrl+End 确保移动到文档末尾（而不只是当前行末尾）
+            content_editor.send_keys(Keys.CONTROL + Keys.END)
+            await asyncio.sleep(0.2)
+            
+            # 再次确保在末尾位置
             content_editor.send_keys(Keys.END)
             await asyncio.sleep(0.2)
             
-            # 3. 添加换行确保话题在新行
-            content_editor.send_keys(Keys.ENTER)
+            # 3. 添加换行分隔话题，确保话题在独立区域
+            content_editor.send_keys(Keys.ENTER + Keys.ENTER)
             await asyncio.sleep(0.2)
+            
+            logger.info("📍 已定位到文章末尾，准备添加话题标签")
             
             success_count = 0
             

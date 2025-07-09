@@ -204,7 +204,7 @@ class XHSNote(BaseModel):
     
     @classmethod
     async def async_smart_create(cls, title: str, content: str, topics=None,
-                                location: str = "", images=None, videos=None) -> 'XHSNote':
+                                location: str = "", images=None, videos=None, cookies=None) -> 'XHSNote':
         """
         异步智能创建笔记对象，支持多种输入格式（包括URL）
         
@@ -218,6 +218,7 @@ class XHSNote(BaseModel):
                    - 网络地址："https://example.com/image.jpg"
                    - 混合数组：["local.jpg", "https://example.com/img.jpg"]
             videos: 视频路径（目前仅支持本地文件）
+            cookies: 浏览器cookies，用于下载需要登录的图片
             
         Returns:
             XHSNote实例
@@ -237,8 +238,9 @@ class XHSNote(BaseModel):
         processed_images = None
         if images:
             from ..utils.image_processor import ImageProcessor
-            processor = ImageProcessor()
-            processed_images = await processor.process_images(images)
+            processor = ImageProcessor(cookies=cookies)
+            # 使用严格模式，确保所有图片都下载成功
+            processed_images = await processor.process_images(images, strict_mode=True)
         
         # 智能解析视频路径（暂时只支持本地文件）
         video_list = smart_parse_file_paths(videos) if videos else None
